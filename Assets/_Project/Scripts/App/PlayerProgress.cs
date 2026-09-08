@@ -40,6 +40,44 @@ namespace NW.App
             }
         }
 
+        /// <summary>The player's chosen display name — one per install, shown on every slot card
+        /// and every leaderboard row. Claimed as globally-unique via <see cref="UsernameService"/>.
+        /// Empty until the player sets one (then the game shows "PILOT").</summary>
+        public static string PilotName
+        {
+            get => PlayerPrefs.GetString("pp_pilotname", "");
+            set { PlayerPrefs.SetString("pp_pilotname", (value ?? "").Trim()); PlayerPrefs.Save(); }
+        }
+
+        public static bool HasPilotName => !string.IsNullOrEmpty(PilotName);
+
+        // ── dev conveniences (testing only) ─────────────────────────────────────
+
+        /// <summary>When true: the dev slot starts fully unlocked and the pilot-select screen shows
+        /// a "TESTING BUILD" notice. On in the editor, and in any build compiled with the
+        /// <c>NW_DEV</c> scripting define. **Remove <c>NW_DEV</c> from Player Settings before
+        /// building the Production track** so real players get a clean start.</summary>
+        public static bool DevMode
+        {
+            get
+            {
+#if NW_DEV
+                return true;
+#else
+                return Application.isEditor;
+#endif
+            }
+        }
+
+        /// <summary>Under <see cref="DevMode"/>, only this slot starts unlocked; the others start
+        /// clean, exactly like a shipped build.</summary>
+        public const int DevSlot = 2;
+
+        const string FreshCurrency = "0,0,0,0,0";
+        const string FreshUnlocks  = "1";
+        const string DevCurrency   = "9999,9999,9999,9999,9999";
+        const string DevUnlocks    = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20";
+
         // ── MMR (competitive rating, global) ─────────────────────────────────────
 
         public const int DefaultMMR = 1200;
@@ -229,11 +267,14 @@ namespace NW.App
                     if (int.TryParse(s, out int lv)) UnlockedLevels.Add(lv);
         }
 
-        /// <summary>Create a brand-new slot with zero currency; immediately loads it.</summary>
+        /// <summary>Create a brand-new slot. A real player starts with an empty wallet and only
+        /// level 1 open. Under <see cref="DevMode"/> the <see cref="DevSlot"/> starts fully
+        /// unlocked for review; every other slot still starts clean.</summary>
         public static void NewSlot(int slot)
         {
-            PlayerPrefs.SetString(CurrencyKey(slot), "9999,9999,9999,9999,9999"); // TESTING: max currency to unlock everything
-            PlayerPrefs.SetString(UnlockKey(slot), "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20"); // TESTING: all levels unlocked
+            bool dev = DevMode && slot == DevSlot;
+            PlayerPrefs.SetString(CurrencyKey(slot), dev ? DevCurrency : FreshCurrency);
+            PlayerPrefs.SetString(UnlockKey(slot),   dev ? DevUnlocks  : FreshUnlocks);
             PlayerPrefs.SetString(NameKey(slot), $"PILOT {slot + 1}");
             PlayerPrefs.Save();
             LoadSlot(slot);
@@ -320,12 +361,16 @@ namespace NW.App
         static string UnlockKey(int slot)   => $"pp_s{slot}_unlocked";
         static string NameKey(int slot)     => $"pp_s{slot}_name";
 
-        /// <summary>Display name of the active save slot (for ghost authorship). Falls back to
-        /// "PILOT" when no slot is loaded.</summary>
+        /// <summary>The name shown for this player everywhere (ghost authorship, leaderboard rows):
+        /// the globally-unique <see cref="PilotName"/> if they've set one, otherwise the active
+        /// slot's local name, otherwise "PILOT".</summary>
         public static string CurrentSlotName()
-            => CurrentSlot >= 0
+        {
+            if (HasPilotName) return PilotName;
+            return CurrentSlot >= 0
                 ? PlayerPrefs.GetString(NameKey(CurrentSlot), $"PILOT {CurrentSlot + 1}")
                 : "PILOT";
+        }
 
         /// <summary>Rename a save slot. The key was always written as "PILOT n" and never
         /// changed, so the field existed but nothing could set it.</summary>

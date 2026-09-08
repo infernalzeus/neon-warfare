@@ -32,3 +32,15 @@ Firestore rules live in `firestore.rules`. Full backend + Play Console guide: `d
 The upload keystore (`*.keystore` / `*.jks`) is gitignored. For a signed build create one via
 **Player Settings → Publishing Settings → Keystore Manager → Create New**, and back it up outside
 the repo.
+
+## 3. Before the Production track — REMOVE `NW_DEV`
+
+`ProjectSettings/ProjectSettings.asset` ships with **`Android: NW_FIREBASE;NW_DEV`**.
+
+`NW_DEV` turns on dev conveniences: **Pilot 3 starts fully unlocked** and the pilot-select screen
+shows a "TESTING BUILD" notice (`PlayerProgress.DevMode`). Fine for Internal / Closed testing.
+
+**Before building for the Production track:** Player Settings → Other Settings → Scripting Define
+Symbols (Android) → delete `NW_DEV` (keep `NW_FIREBASE`). Real players then get a clean start —
+empty wallet, only level 1 open — and no notice. The editor keeps dev unlocks regardless
+(`Application.isEditor`).

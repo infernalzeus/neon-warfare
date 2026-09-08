@@ -31,8 +31,8 @@ NEON WARFARE contains no advertising and no third-party analytics or tracking SD
 ## Who processes the data
 
 Google, through **Firebase Authentication** and **Cloud Firestore**, stores this data on our
-behalf as a data processor. The Firestore database is hosted in the **European Union**
-(`europe-west1`). Google's handling of the data is governed by the
+behalf as a data processor, in Google Cloud data centres (currently in the **United States**).
+Google's handling of the data is governed by the
 [Firebase Data Processing Terms](https://firebase.google.com/terms/data-processing-terms).
 
 ## Retention and deletion

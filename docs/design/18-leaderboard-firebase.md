@@ -153,6 +153,11 @@ Rules enforce **shape, size, and that `score` matches the formula** — they can
 ghost, a later pass can replay it to validate. Note: anyone can `pilotId`-spoof another player's
 row only if they know that id (a GUID) — low risk, and `delete` is denied.
 
+The `firestore.rules` file also contains a **`usernames/{key}`** block (unique pilot names —
+`UsernameService`). `create` requires `uid == request.auth.uid` and a 3–16-char name; only the
+owning `uid` can `update`/`delete` (release) it. **Re-publish `firestore.rules` in the console after
+this change.**
+
 ## 8. Composite index
 
 The `FetchTop` query is `orderBy(score, desc).limit(n)` on a subcollection — a **collection-group

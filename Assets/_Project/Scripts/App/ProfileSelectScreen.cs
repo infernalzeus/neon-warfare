@@ -16,6 +16,7 @@ namespace NW.App
         public Action<int> OnSlotSelected;
 
         Font _font;
+        Text _statusLine;   // one shared line near the bottom for name-claim feedback
 
         static readonly Color CyanPrimary  = new Color(0.05f, 0.90f, 1.00f);
         static readonly Color CyanDim      = new Color(0.03f, 0.55f, 0.65f);
@@ -59,6 +60,7 @@ namespace NW.App
             BuildGrid();
             BuildHeader();
             BuildSlotCards();
+            BuildStatusLine();
 
             StartCoroutine(EntranceAnim());
         }
@@ -107,13 +109,37 @@ namespace NW.App
                 new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.30f));
             var sub = subGo.AddComponent<Text>();
             sub.font = _font; sub.fontSize = UIScale.FontBody;
-            sub.color = new Color(0.58f, 0.78f, 0.86f, 1f);
             sub.alignment = TextAnchor.MiddleCenter;
-            sub.text = "Pick a save slot to play. Tap a name to rename it.";
+            bool dev = PlayerProgress.DevMode;
+            sub.text = dev
+                ? $"TESTING BUILD — Pilot {PlayerProgress.DevSlot + 1} starts fully unlocked.  Tap a name to rename it."
+                : "Pick a save slot to play. Tap a name to rename it.";
+            sub.color = dev ? new Color(1f, 0.72f, 0.18f) : new Color(0.58f, 0.78f, 0.86f, 1f);
             sub.raycastTarget = false;
 
             // Cyan divider under header
             MakeLine(rt, new Vector2(0, 0.87f), new Vector2(1, 0.87f), 2, new Color(0f, 0.85f, 1f, 0.55f));
+        }
+
+        // ─────────────────────────── name-claim status line ───────────────
+
+        void BuildStatusLine()
+        {
+            var rt = GetComponent<RectTransform>();
+            var go = MakeRect(rt, "StatusLine", new Vector2(0.05f, 0.015f), new Vector2(0.95f, 0.075f));
+            _statusLine = go.AddComponent<Text>();
+            _statusLine.font = _font; _statusLine.fontSize = UIScale.FontSmall;
+            _statusLine.alignment = TextAnchor.MiddleCenter;
+            _statusLine.color = TextQuiet;
+            _statusLine.raycastTarget = false;
+            _statusLine.text = "";
+        }
+
+        void SetStatus(string msg, Color col)
+        {
+            if (_statusLine == null) return;
+            _statusLine.text = msg;
+            _statusLine.color = col;
         }
 
         // ───────────────────────────────── slot cards ─────────────────────
@@ -218,13 +244,14 @@ namespace NW.App
             nameTxt.supportRichText = false;
             nameTxt.color = Color.white;
             nameTxt.alignment = TextAnchor.MiddleCenter;
-            nameTxt.text = name;
+            // One pilot name per player, shown on every card. Falls back to the slot's local
+            // name until the player picks one.
+            string shown = PlayerProgress.HasPilotName ? PlayerProgress.PilotName : name;
+            nameTxt.text = shown;
             nameTxt.raycastTarget = false;
 
-            // The name is editable. PlayerProgress has always had a per-slot name key, but
-            // nothing could ever write anything except the default "PILOT n" -- so the slots
-            // were permanently anonymous. Tapping the name now edits it in place and the new
-            // value is what the rest of the game reads back.
+            // Editing the name claims it as a globally-unique handle via UsernameService
+            // (Firestore-backed; falls back to a local-only name when offline).
             var editGo = MakeRect(card, "nameEdit", Vector2.zero, Vector2.one);
             var editRt = editGo.GetComponent<RectTransform>();
             editRt.anchorMin = new Vector2(0.04f, 0.735f);
@@ -234,8 +261,8 @@ namespace NW.App
             editImg.color = new Color(1f, 1f, 1f, 0.06f);          // a faint tappable well
             var field = editGo.AddComponent<InputField>();
             field.textComponent   = nameTxt;
-            field.text            = name;
-            field.characterLimit  = 12;
+            field.text            = shown;
+            field.characterLimit  = UsernameService.MaxLen;
             field.lineType        = InputField.LineType.SingleLine;
             field.transition      = Selectable.Transition.None;
             nameGo.transform.SetParent(editGo.transform, false);
@@ -245,9 +272,35 @@ namespace NW.App
             int capturedSlot = slot;
             field.onEndEdit.AddListener(v =>
             {
-                PlayerProgress.SetSlotName(capturedSlot, v);
-                var (nm, _, _) = PlayerProgress.GetSlotPreview(capturedSlot);
-                field.text = nm;                                    // reflect the clamped value
+                string fallback = PlayerProgress.HasPilotName
+                    ? PlayerProgress.PilotName : $"PILOT {capturedSlot + 1}";
+                if (!UsernameService.IsValid(v))
+                {
+                    field.text = fallback;
+                    SetStatus($"Name must be {UsernameService.MinLen}–{UsernameService.MaxLen} letters or digits.",
+                              new Color(1f, 0.5f, 0.4f));
+                    return;
+                }
+                SetStatus("checking name…", TextQuiet);
+                UsernameService.TryClaim(v, (status, accepted) =>
+                {
+                    field.text = accepted.Length > 0 ? accepted : fallback;
+                    switch (status)
+                    {
+                        case UsernameService.Status.Ok:
+                            SetStatus("✓ name reserved", new Color(0.4f, 0.95f, 0.55f)); break;
+                        case UsernameService.Status.Taken:
+                            SetStatus("That name is taken — try another.", new Color(1f, 0.5f, 0.4f)); break;
+                        case UsernameService.Status.Offline:
+                            SetStatus("Saved — it'll be reserved once you're online.",
+                                      new Color(1f, 0.72f, 0.18f)); break;
+                        case UsernameService.Status.Invalid:
+                            SetStatus($"Name must be {UsernameService.MinLen}–{UsernameService.MaxLen} characters.",
+                                      new Color(1f, 0.5f, 0.4f)); break;
+                        default:
+                            SetStatus("Couldn't save the name — try again.", new Color(1f, 0.5f, 0.4f)); break;
+                    }
+                });
             });
 
             // Deployment tier
