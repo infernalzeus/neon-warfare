@@ -1,0 +1,55 @@
+# ── Unity generated ────────────────────────────────────────────────────
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Tt]est[Rr]esults/
+.utmp/
+.consulo/
+*.csproj
+*.sln
+*.slnx
+*.unityproj
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+crashlytics-build.properties
+/[Aa]ssets/AddressableAssetsData/*/*.bin*
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ── Editors ───────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+
+# ── Working backups (kept on disk, out of git) ───────────────────────
+*.bak
+*.bak.*
+*.bak-*
+*.bak_*
+*.orig
+
+# ── Secrets / signing / store artifacts ─────────────────────────────
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.jks
+user.keystore
+keystore.properties
+*.apk
+*.aab
+*.aab.idsig

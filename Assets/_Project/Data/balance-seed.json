@@ -1,0 +1,16 @@
+{
+  "units": [
+    { "id": "drone",         "name": "Drone",         "cls": "Assault", "energy": 20,  "plasma": 0,  "nano": 0,  "quantum": 0,  "data": 0,  "cd": 2,  "hp": 60,   "dmg": 6,  "atkCd": 0.5, "speed": 12, "range": 1.5, "aoe": 0, "air": false, "tAir": false, "dirCost": 8 },
+    { "id": "shock_trooper", "name": "Shock Trooper", "cls": "Assault", "energy": 35,  "plasma": 0,  "nano": 0,  "quantum": 0,  "data": 0,  "cd": 3,  "hp": 90,   "dmg": 8,  "atkCd": 0.5, "speed": 9,  "range": 12,  "aoe": 0, "air": false, "tAir": true,  "dirCost": 12 },
+    { "id": "mech_walker",   "name": "Mech Walker",   "cls": "Assault", "energy": 60,  "plasma": 0,  "nano": 10, "quantum": 0,  "data": 0,  "cd": 5,  "hp": 220,  "dmg": 11, "atkCd": 0.5, "speed": 7,  "range": 2,   "aoe": 0, "air": false, "tAir": false, "dirCost": 20 },
+    { "id": "titan",         "name": "Titan",         "cls": "Heavy",   "energy": 120, "plasma": 0,  "nano": 40, "quantum": 0,  "data": 0,  "cd": 8,  "hp": 900,  "dmg": 25, "atkCd": 1.0, "speed": 5,  "range": 2,   "aoe": 0, "air": false, "tAir": false, "dirCost": 45 },
+    { "id": "siege_tank",    "name": "Siege Tank",    "cls": "Heavy",   "energy": 100, "plasma": 0,  "nano": 30, "quantum": 0,  "data": 0,  "cd": 8,  "hp": 450,  "dmg": 40, "atkCd": 1.0, "speed": 5,  "range": 25,  "aoe": 4, "air": false, "tAir": false, "dirCost": 40 },
+    { "id": "juggernaut",    "name": "Juggernaut",    "cls": "Heavy",   "energy": 150, "plasma": 0,  "nano": 60, "quantum": 0,  "data": 0,  "cd": 10, "hp": 1200, "dmg": 35, "atkCd": 1.0, "speed": 4,  "range": 2.5, "aoe": 2, "air": false, "tAir": false, "dirCost": 60 },
+    { "id": "interceptor",   "name": "Interceptor",   "cls": "Air",     "energy": 45,  "plasma": 15, "nano": 0,  "quantum": 0,  "data": 0,  "cd": 3,  "hp": 80,   "dmg": 10, "atkCd": 0.5, "speed": 14, "range": 8,   "aoe": 0, "air": true,  "tAir": true,  "dirCost": 16 },
+    { "id": "bomber",        "name": "Bomber",        "cls": "Air",     "energy": 80,  "plasma": 30, "nano": 0,  "quantum": 0,  "data": 0,  "cd": 6,  "hp": 150,  "dmg": 30, "atkCd": 1.0, "speed": 10, "range": 3,   "aoe": 5, "air": true,  "tAir": false, "dirCost": 30 },
+    { "id": "gunship",       "name": "Gunship",       "cls": "Air",     "energy": 110, "plasma": 45, "nano": 0,  "quantum": 0,  "data": 0,  "cd": 8,  "hp": 380,  "dmg": 22, "atkCd": 0.5, "speed": 8,  "range": 14,  "aoe": 0, "air": true,  "tAir": true,  "dirCost": 45 },
+    { "id": "hacker",        "name": "Hacker",        "cls": "Special", "energy": 50,  "plasma": 0,  "nano": 0,  "quantum": 0,  "data": 20, "cd": 5,  "hp": 70,   "dmg": 3,  "atkCd": 0.5, "speed": 8,  "range": 16,  "aoe": 0, "air": false, "tAir": false, "dirCost": 18 },
+    { "id": "teleporter",    "name": "Teleporter",    "cls": "Special", "energy": 70,  "plasma": 0,  "nano": 0,  "quantum": 25, "data": 0,  "cd": 6,  "hp": 110,  "dmg": 7,  "atkCd": 0.5, "speed": 9,  "range": 10,  "aoe": 0, "air": false, "tAir": false, "dirCost": 24 },
+    { "id": "chronomancer",  "name": "Chronomancer",  "cls": "Special", "energy": 90,  "plasma": 0,  "nano": 0,  "quantum": 35, "data": 0,  "cd": 9,  "hp": 130,  "dmg": 5,  "atkCd": 0.5, "speed": 7,  "range": 18,  "aoe": 0, "air": false, "tAir": true,  "dirCost": 32 }
+  ]
+}

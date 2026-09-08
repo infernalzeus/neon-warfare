@@ -1,0 +1,7 @@
+{
+    "name": "NW.Combat.Domain",
+    "rootNamespace": "NW.Combat.Domain",
+    "references": ["NW.Domain"],
+    "noEngineReferences": true,
+    "autoReferenced": true
+}

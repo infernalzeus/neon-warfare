@@ -1,0 +1,7 @@
+{
+    "name": "NW.Editor",
+    "rootNamespace": "NW.Editor",
+    "references": ["NW.Data", "NW.Core", "NW.Domain", "NW.Combat.Domain", "NW.Board.Domain"],
+    "includePlatforms": ["Editor"],
+    "autoReferenced": true
+}

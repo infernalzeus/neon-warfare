@@ -1,0 +1,7 @@
+{
+    "name": "NW.Domain",
+    "rootNamespace": "NW.Domain",
+    "references": [],
+    "noEngineReferences": true,
+    "autoReferenced": true
+}

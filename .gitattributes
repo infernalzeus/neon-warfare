@@ -1,0 +1,30 @@
+# Unity project — keep line endings as authored, never auto-convert.
+* -text
+
+# Unity YAML assets: force text merge so conflicts are resolvable,
+# and mark for Unity's smart merge tool if configured.
+*.cs        text
+*.shader    text
+*.meta      text merge=unityyamlmerge eol=lf
+*.unity     text merge=unityyamlmerge eol=lf
+*.asset     text merge=unityyamlmerge eol=lf
+*.prefab    text merge=unityyamlmerge eol=lf
+*.mat       text merge=unityyamlmerge eol=lf
+*.controller text merge=unityyamlmerge eol=lf
+
+# Binary assets — never diff or convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.psd binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.ttf binary
+*.otf binary
+*.fbx binary
+*.blend binary
+*.aab binary
+*.apk binary
+*.keystore binary

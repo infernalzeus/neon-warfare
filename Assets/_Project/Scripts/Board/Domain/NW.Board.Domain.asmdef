@@ -1,0 +1,7 @@
+{
+    "name": "NW.Board.Domain",
+    "rootNamespace": "NW.Board.Domain",
+    "references": ["NW.Domain"],
+    "noEngineReferences": true,
+    "autoReferenced": true
+}

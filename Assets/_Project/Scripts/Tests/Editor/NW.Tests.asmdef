@@ -1,0 +1,18 @@
+{
+    "name": "NW.Tests",
+    "rootNamespace": "NW.Tests",
+    "references": [
+        "NW.Domain",
+        "NW.Board.Domain",
+        "NW.Combat.Domain",
+        "NW.Core",
+        "NW.Data",
+        "NW.App",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": ["Editor"],
+    "precompiledReferences": ["nunit.framework.dll"],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "autoReferenced": false
+}

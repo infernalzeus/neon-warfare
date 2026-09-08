@@ -1,0 +1,880 @@
+[
+ {
+  "theme": "CYBER",
+  "unit": "CybDrone",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "dv"
+  ]
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybTrooper",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybSniper",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybMech",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybShield",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybInter",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybHacker",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybTitan",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "CYBER",
+  "unit": "CybTurret",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynBot",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "dv"
+  ]
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynRacer",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynLaser",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynCruiser",
+  "ground": false,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynBouncer",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynSpeeder",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynKeytar",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynObelisk",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SYNTHWAVE",
+  "unit": "SynPylon",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Spore",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "dv"
+  ]
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Mutant",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Stinger",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Crawler",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "t"
+  ]
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Carapace",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Swarm",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "b1"
+  ]
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Mycelium",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway"
+  ]
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Hive",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "BIOPUNK",
+  "unit": "Pod",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Pigeon",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "up"
+  ]
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Knight",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "capeSway"
+  ]
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Archer",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Siege",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "roll"
+  ]
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Paladin",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Rogue",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Wizard",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Golem",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "MEDIEVAL",
+  "unit": "Ballista",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Rivetbot",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "dv",
+   "spin"
+  ]
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Worker",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Gunner",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Crane",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "roll"
+  ]
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Bulkhead",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Ornithopter",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat",
+   "ca"
+  ]
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Engineer",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Furnace",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "INDUSTRIAL",
+  "unit": "Gatling",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Wisp",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "dv",
+   "swing"
+  ]
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Shinobi",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway"
+  ]
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Yumi",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Tanuki",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "ShrineGuard",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Kite",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Onmyoji",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Kami",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SAKURA",
+  "unit": "Torii",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Ember",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "tilt",
+   "dv",
+   "spin"
+  ]
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Guardian",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway"
+  ]
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Raycaster",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Forgewalker",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Aegis",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Phoenix",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Pyromancer",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway"
+  ]
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Colossus",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "SOLAR",
+  "unit": "Heliostat",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Sprite",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "dv",
+   "wob"
+  ]
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Wanderer",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Seeker",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Caravan",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": [
+   "st"
+  ]
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Ward",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Glider",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": true,
+  "varying": [
+   "beat"
+  ]
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Oracle",
+  "ground": true,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": true,
+  "arms": true,
+  "wpn": true,
+  "varying": [
+   "sway",
+   "bob"
+  ]
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Sentinel",
+  "ground": true,
+  "legs4": true,
+  "legs_explicit": true,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ },
+ {
+  "theme": "DAWN",
+  "unit": "Beacon",
+  "ground": false,
+  "legs4": false,
+  "legs_explicit": false,
+  "table": false,
+  "arms": false,
+  "wpn": false,
+  "varying": []
+ }
+]

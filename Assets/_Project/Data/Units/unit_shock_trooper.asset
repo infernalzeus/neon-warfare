@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: unit_shock_trooper
+  m_EditorClassIdentifier: NW.Data:NW.Data:UnitDef
+  id: shock_trooper
+  displayName: Shock Trooper
+  description: 
+  unitClass: 0
+  cost:
+    energy: 35
+    plasma: 0
+    nano: 0
+    quantum: 0
+    data: 0
+  compileCooldown: 3
+  unlockMissionIndex: 0
+  maxHp: 90
+  damage: 8
+  attackCooldown: 0.5
+  speed: 9
+  range: 12
+  aoeRadius: 0
+  isAir: 0
+  targetsAir: 1
+  targetsGround: 1
+  directorCost: 12
+  portrait: {fileID: 0}
+  viewPrefab: {fileID: 0}

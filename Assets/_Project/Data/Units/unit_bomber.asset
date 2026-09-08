@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: unit_bomber
+  m_EditorClassIdentifier: NW.Data:NW.Data:UnitDef
+  id: bomber
+  displayName: Bomber
+  description: 
+  unitClass: 2
+  cost:
+    energy: 80
+    plasma: 30
+    nano: 0
+    quantum: 0
+    data: 0
+  compileCooldown: 6
+  unlockMissionIndex: 0
+  maxHp: 150
+  damage: 30
+  attackCooldown: 1
+  speed: 10
+  range: 3
+  aoeRadius: 5
+  isAir: 1
+  targetsAir: 0
+  targetsGround: 1
+  directorCost: 30
+  portrait: {fileID: 0}
+  viewPrefab: {fileID: 0}

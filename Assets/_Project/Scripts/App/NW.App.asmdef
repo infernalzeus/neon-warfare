@@ -1,0 +1,6 @@
+{
+    "name": "NW.App",
+    "rootNamespace": "NW.App",
+    "references": ["NW.Core", "NW.Data", "NW.Domain", "NW.Board.Domain", "NW.Combat.Domain"],
+    "autoReferenced": true
+}

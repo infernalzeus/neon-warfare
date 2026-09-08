@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: unit_chronomancer
+  m_EditorClassIdentifier: NW.Data:NW.Data:UnitDef
+  id: chronomancer
+  displayName: Chronomancer
+  description: 
+  unitClass: 3
+  cost:
+    energy: 90
+    plasma: 0
+    nano: 0
+    quantum: 35
+    data: 0
+  compileCooldown: 9
+  unlockMissionIndex: 0
+  maxHp: 130
+  damage: 5
+  attackCooldown: 0.5
+  speed: 7
+  range: 18
+  aoeRadius: 0
+  isAir: 0
+  targetsAir: 1
+  targetsGround: 1
+  directorCost: 32
+  portrait: {fileID: 0}
+  viewPrefab: {fileID: 0}

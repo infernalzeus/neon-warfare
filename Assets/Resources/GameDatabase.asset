@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: GameDatabase
+  m_EditorClassIdentifier: NW.Data:NW.Data:GameDatabase
+  units:
+  - {fileID: 11400000, guid: c21754929c4227d4a8056e7869b79757, type: 2}
+  - {fileID: 11400000, guid: 11b62d0fa4bbf614fb7f66b25b7b982f, type: 2}
+  - {fileID: 11400000, guid: f3f5b24f645f8af4b9acacaa58a50888, type: 2}
+  - {fileID: 11400000, guid: e5be341212e337c4794006ba5032f4d8, type: 2}
+  - {fileID: 11400000, guid: 782867934fac40c4098e19e8ed03591c, type: 2}
+  - {fileID: 11400000, guid: 1044b4aaff2756042b492bcf522a7d52, type: 2}
+  - {fileID: 11400000, guid: 221703284e1f47c48b546215d4902d30, type: 2}
+  - {fileID: 11400000, guid: c4ccbe22fc8c0f04d825a68e1627598e, type: 2}
+  - {fileID: 11400000, guid: 87c865dd4ff777143a19d40b3873409a, type: 2}
+  - {fileID: 11400000, guid: 63645c40ff134ef47b22215674bdd0d3, type: 2}
+  - {fileID: 11400000, guid: c44b5e78d5af9824f8bb65b727a9182c, type: 2}
+  - {fileID: 11400000, guid: 67da2523ca93588409e42024b2e0b92c, type: 2}
+  heroes: []
+  protocols: []
+  missions: []
