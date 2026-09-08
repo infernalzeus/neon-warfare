@@ -45,6 +45,7 @@ crashlytics-build.properties
 
 # ── Secrets / signing / store artifacts ─────────────────────────────
 google-services.json
+google-services-desktop.json
 GoogleService-Info.plist
 *.keystore
 *.jks
@@ -53,3 +54,26 @@ keystore.properties
 *.apk
 *.aab
 *.aab.idsig
+
+# ── Firebase Unity SDK (~300 MB of vendored binaries) ───────────────
+# Reproducible: import FirebaseAuth + FirebaseFirestore .unitypackages,
+# then External Dependency Manager > Android Resolver > Force Resolve.
+# See SETUP.md. Not committed to keep the repo small (bandwidth-friendly).
+/[Aa]ssets/Firebase/
+/[Aa]ssets/Firebase.meta
+/[Aa]ssets/GeneratedLocalRepo/
+/[Aa]ssets/GeneratedLocalRepo.meta
+/[Aa]ssets/ExternalDependencyManager/
+/[Aa]ssets/ExternalDependencyManager.meta
+/[Aa]ssets/Editor Default Resources/Firebase/
+/[Aa]ssets/Editor Default Resources/Firebase.meta
+/[Aa]ssets/Plugins/iOS/Firebase/
+/[Aa]ssets/Plugins/iOS/Firebase.meta
+/[Aa]ssets/Plugins/tvOS/Firebase/
+/[Aa]ssets/Plugins/tvOS/Firebase.meta
+/[Aa]ssets/Plugins/Android/*.aar
+/[Aa]ssets/Plugins/Android/*.srcaar
+/[Aa]ssets/Plugins/Android/FirebaseApp.androidlib/
+# EDM4U keeps these Gradle templates in Plugins/Android — those ARE committed
+# (small, part of the build config): mainTemplate.gradle, gradleTemplate.properties,
+# settingsTemplate.gradle, launcherTemplate.gradle, baseProjectTemplate.gradle
