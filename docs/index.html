@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEON WARFARE</title>
+<meta name="description" content="NEON WARFARE — a single-player strategy game that fuses a match-3 board with real-time lane combat. Android.">
+<style>
+  :root {
+    --bg: #070a12;
+    --bg2: #0d1322;
+    --ink: #dbe4f3;
+    --dim: #8794ac;
+    --cyan: #4fd0ff;
+    --magenta: #ff5cc8;
+    --lime: #7dffb2;
+    --amber: #ffcf5c;
+    --line: #ffffff1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background:
+      radial-gradient(1100px 620px at 78% -8%, #17284a 0%, transparent 60%),
+      radial-gradient(900px 520px at 8% 108%, #3a1440 0%, transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--cyan); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 1.25rem; }
+
+  header.hero { padding: 4.5rem 0 2rem; }
+  .badge {
+    display: inline-block; font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--amber); border: 1px solid #ffcf5c55; border-radius: 999px;
+    padding: .3rem .7rem; margin-bottom: 1.4rem;
+  }
+  h1.mark {
+    font-size: clamp(2.6rem, 8vw, 4.6rem); line-height: .96; margin: 0 0 .5rem;
+    font-weight: 800; letter-spacing: .02em;
+    background: linear-gradient(92deg, var(--cyan), #a9e8ff 40%, var(--magenta));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px #4fd0ff22;
+  }
+  .tag { font-size: clamp(1.05rem, 2.6vw, 1.4rem); color: var(--ink); margin: 0 0 .4rem; font-weight: 600; }
+  .sub { color: var(--dim); max-width: 46ch; margin: 0 0 2rem; }
+
+  .layout { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2.5rem; align-items: start; }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } .shot { order: -1; } }
+
+  .shot { display: flex; justify-content: center; }
+  .shot svg { width: 100%; max-width: 300px; height: auto; filter: drop-shadow(0 24px 60px #000a); }
+
+  h2 {
+    font-size: .82rem; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan);
+    margin: 3.2rem 0 1.1rem;
+  }
+  .loop { list-style: none; padding: 0; margin: 0; display: grid; gap: .55rem; }
+  .loop li { display: flex; gap: .8rem; align-items: baseline; }
+  .loop b {
+    flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center;
+    font-size: .8rem; border-radius: 6px; background: #4fd0ff1c; color: var(--cyan); font-weight: 700;
+  }
+  .loop span { color: var(--ink); }
+  .loop small { color: var(--dim); }
+
+  .feat { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
+          border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  @media (max-width: 560px) { .feat { grid-template-columns: 1fr; } }
+  .feat div { background: var(--bg2); padding: 1rem 1.1rem; }
+  .feat h3 { margin: 0 0 .2rem; font-size: .95rem; color: var(--ink); }
+  .feat p { margin: 0; font-size: .88rem; color: var(--dim); }
+
+  .rule { color: var(--lime); font-weight: 600; }
+
+  footer {
+    margin-top: 4rem; border-top: 1px solid var(--line); padding: 1.6rem 0 3rem;
+    color: var(--dim); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="badge">Coming to Google&nbsp;Play · internal testing</span>
+    <h1 class="mark">NEON&nbsp;WARFARE</h1>
+    <p class="tag">Match-3 meets neon lane warfare.</p>
+    <p class="sub">A single-player strategy game that fuses a match-3 board with real-time
+      lane combat. Mine gems, deploy troops, seize the pylons, break the core.</p>
+
+    <div class="layout">
+      <div>
+        <h2>How it plays</h2>
+        <ol class="loop">
+          <li><b>1</b><span>Match gems on the board <small>— each colour mines one of five resources</small></span></li>
+          <li><b>2</b><span>Spend resources to deploy troops <small>— four ground lanes and the air lane</small></span></li>
+          <li><b>3</b><span>Push the frontline and capture the pylons <small>— hold them to power up</small></span></li>
+          <li><b>4</b><span>Trigger a SURGE, then destroy the enemy core <small>— before the timer runs out</small></span></li>
+        </ol>
+
+        <h2>What's in it</h2>
+        <div class="feat">
+          <div><h3>20-level campaign</h3><p>Three acts with a rising difficulty curve and a director that adapts to you.</p></div>
+          <div><h3>Nine unit types</h3><p>Ground, air and siege, tied together by a rock-paper-scissors class triangle.</p></div>
+          <div><h3>Crossover strikes</h3><p>Big matches on the board fire lasers, orbital hits, EMP and shockwaves into the battlefield.</p></div>
+          <div><h3>Ghost ladder</h3><p>Every match is recorded as a “ghost” and replayed as your opponent. Climb a daily skill-rated leaderboard against other players' runs.</p></div>
+          <div><h3>Themes &amp; cosmetics</h3><p>Five colour themes and unlockable board skins — bought only with tokens you earn by playing.</p></div>
+          <div><h3>Plays offline</h3><p>The whole campaign runs with no connection. The online leaderboard is optional.</p></div>
+        </div>
+
+        <p style="margin-top:1.6rem" class="rule">No ads. No in-app purchases. No third-party tracking.</p>
+      </div>
+
+      <div class="shot" aria-label="Stylised screenshot of the vertical battle layout">
+        <svg viewBox="0 0 300 620" xmlns="http://www.w3.org/2000/svg" role="img">
+          <defs>
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#12213f"/><stop offset="1" stop-color="#0b1120"/>
+            </linearGradient>
+            <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#4fd0ff"/><stop offset="1" stop-color="#ff5cc8"/>
+            </linearGradient>
+          </defs>
+
+          <!-- phone frame -->
+          <rect x="2" y="2" width="296" height="616" rx="26" fill="#05070d" stroke="url(#edge)" stroke-width="2"/>
+          <rect x="12" y="12" width="276" height="596" rx="18" fill="url(#sky)"/>
+
+          <!-- currency sidebar -->
+          <rect x="12" y="12" width="30" height="360" fill="#0a1120"/>
+          <g>
+            <circle cx="27" cy="46" r="7" fill="#4fd0ff"/><circle cx="27" cy="72" r="7" fill="#ff5cc8"/>
+            <circle cx="27" cy="98" r="7" fill="#7dffb2"/><circle cx="27" cy="124" r="7" fill="#ffcf5c"/>
+            <circle cx="27" cy="150" r="7" fill="#b98cff"/>
+          </g>
+
+          <!-- battlefield -->
+          <g>
+            <rect x="42" y="18" width="240" height="196" fill="#0c1730"/>
+            <!-- lanes -->
+            <g stroke="#ffffff14" stroke-width="1">
+              <line x1="42" y1="52" x2="282" y2="52"/><line x1="42" y1="86" x2="282" y2="86"/>
+              <line x1="42" y1="120" x2="282" y2="120"/><line x1="42" y1="154" x2="282" y2="154"/>
+            </g>
+            <!-- frontline -->
+            <path d="M42,150 L110,132 L150,150 L200,120 L282,140" fill="none" stroke="#4fd0ff" stroke-width="2" opacity=".8"/>
+            <!-- pylons -->
+            <circle cx="122" cy="116" r="9" fill="none" stroke="#7dffb2" stroke-width="2"/>
+            <circle cx="212" cy="116" r="9" fill="none" stroke="#ff5cc8" stroke-width="2"/>
+            <!-- cores -->
+            <rect x="46" y="96" width="12" height="40" rx="3" fill="#4fd0ff"/>
+            <rect x="266" y="96" width="12" height="40" rx="3" fill="#ff5cc8"/>
+            <!-- unit blips -->
+            <g fill="#cfe9ff">
+              <rect x="70" y="48" width="7" height="7"/><rect x="92" y="82" width="7" height="7"/>
+              <rect x="84" y="150" width="7" height="7"/><rect x="118" y="116" width="7" height="7"/>
+            </g>
+            <g fill="#ffb0e2">
+              <rect x="238" y="48" width="7" height="7"/><rect x="224" y="118" width="7" height="7"/>
+              <rect x="250" y="152" width="7" height="7"/>
+            </g>
+            <!-- laser crossover -->
+            <line x1="150" y1="470" x2="176" y2="150" stroke="#ffcf5c" stroke-width="2" opacity=".5"/>
+          </g>
+
+          <!-- command strip -->
+          <g>
+            <rect x="42" y="220" width="240" height="52" fill="#0a1222"/>
+            <g fill="#101a2e" stroke="#ffffff1f">
+              <rect x="52"  y="228" width="40" height="36" rx="5"/>
+              <rect x="98"  y="228" width="40" height="36" rx="5"/>
+              <rect x="144" y="228" width="40" height="36" rx="5"/>
+              <rect x="190" y="228" width="40" height="36" rx="5"/>
+              <rect x="236" y="228" width="40" height="36" rx="5"/>
+            </g>
+            <g fill="#4fd0ff"><circle cx="72" cy="246" r="5"/></g>
+            <g fill="#ff5cc8"><circle cx="118" cy="246" r="5"/></g>
+            <g fill="#7dffb2"><circle cx="164" cy="246" r="5"/></g>
+            <g fill="#ffcf5c"><circle cx="210" cy="246" r="5"/></g>
+            <g fill="#b98cff"><circle cx="256" cy="246" r="5"/></g>
+          </g>
+
+          <!-- match-3 board -->
+          <g>
+            <rect x="42" y="280" width="240" height="316" fill="#0a0f1c"/>
+            <g>
+              <!-- 7 cols x 8 rows sample -->
+              <!-- row helper via manual placement -->
+              <g>
+                <!-- generated grid -->
+                <!-- r0 --><rect x="50" y="288" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="82" y="288" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="114" y="288" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="146" y="288" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="178" y="288" width="26" height="26" rx="5" fill="#b98cff"/><rect x="210" y="288" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="242" y="288" width="26" height="26" rx="5" fill="#ff5cc8"/>
+                <!-- r1 --><rect x="50" y="320" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="82" y="320" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="114" y="320" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="146" y="320" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="178" y="320" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="210" y="320" width="26" height="26" rx="5" fill="#b98cff"/><rect x="242" y="320" width="26" height="26" rx="5" fill="#ffcf5c"/>
+                <!-- r2 --><rect x="50" y="352" width="26" height="26" rx="5" fill="#b98cff"/><rect x="82" y="352" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="114" y="352" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="146" y="352" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="178" y="352" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="210" y="352" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="242" y="352" width="26" height="26" rx="5" fill="#4fd0ff"/>
+                <!-- r3 --><rect x="50" y="384" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="82" y="384" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="114" y="384" width="26" height="26" rx="5" fill="#b98cff"/><rect x="146" y="384" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="178" y="384" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="210" y="384" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="242" y="384" width="26" height="26" rx="5" fill="#7dffb2"/>
+                <!-- r4 --><rect x="50" y="416" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="82" y="416" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="114" y="416" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="146" y="416" width="26" height="26" rx="5" fill="#b98cff"/><rect x="178" y="416" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="210" y="416" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="242" y="416" width="26" height="26" rx="5" fill="#b98cff"/>
+                <!-- r5 --><rect x="50" y="448" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="82" y="448" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="114" y="448" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="146" y="448" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="178" y="448" width="26" height="26" rx="5" fill="#b98cff"/><rect x="210" y="448" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="242" y="448" width="26" height="26" rx="5" fill="#ffcf5c"/>
+                <!-- r6 --><rect x="50" y="480" width="26" height="26" rx="5" fill="#b98cff"/><rect x="82" y="480" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="114" y="480" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="146" y="480" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="178" y="480" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="210" y="480" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="242" y="480" width="26" height="26" rx="5" fill="#ff5cc8"/>
+                <!-- r7 --><rect x="50" y="512" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="82" y="512" width="26" height="26" rx="5" fill="#b98cff"/><rect x="114" y="512" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="146" y="512" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="178" y="512" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="210" y="512" width="26" height="26" rx="5" fill="#b98cff"/><rect x="242" y="512" width="26" height="26" rx="5" fill="#4fd0ff"/>
+                <!-- r8 --><rect x="50" y="544" width="26" height="26" rx="5" fill="#7dffb2"/><rect x="82" y="544" width="26" height="26" rx="5" fill="#4fd0ff"/><rect x="114" y="544" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="146" y="544" width="26" height="26" rx="5" fill="#ff5cc8"/><rect x="178" y="544" width="26" height="26" rx="5" fill="#b98cff"/><rect x="210" y="544" width="26" height="26" rx="5" fill="#ffcf5c"/><rect x="242" y="544" width="26" height="26" rx="5" fill="#7dffb2"/>
+              </g>
+              <!-- match highlight on r2 amber triple -->
+              <rect x="112" y="350" width="126" height="30" rx="8" fill="none" stroke="#fff" stroke-width="2" opacity=".85"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <footer>
+    <span>Single-player strategy · Android</span>
+    <span><a href="privacy-notice/">Privacy policy</a></span>
+    <span><a href="mailto:infernalzeus69@gmail.com">infernalzeus69@gmail.com</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
