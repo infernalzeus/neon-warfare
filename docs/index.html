@@ -26,76 +26,61 @@
   body {
     margin: 0;
     font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background:
-      radial-gradient(1100px 620px at 78% -8%, #17284a 0%, transparent 60%),
-      radial-gradient(900px 520px at 8% 108%, #3a1440 0%, transparent 55%),
-      var(--bg);
+    background: var(--bg);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--cyan); }
   img { max-width: 100%; display: block; }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 1.25rem; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
 
-  header.hero { padding: 4rem 0 1rem; }
-  .brandline { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.1rem; }
-  .brandline img { width: 60px; height: 60px; filter: drop-shadow(0 0 18px #4fd0ff55); }
+  /* hero over a real in-game backdrop */
+  .hero {
+    position: relative; overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero .bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: .40;
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, #070a1266 0%, #070a12dd 78%, var(--bg) 100%);
+  }
+  .hero .inner { position: relative; z-index: 1; padding: 4rem 0 3rem; }
+  .brandline { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
+  .brandline img { width: 58px; height: 58px; filter: drop-shadow(0 0 18px #4fd0ff66); }
   .badge {
     display: inline-block; font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
-    color: var(--amber); border: 1px solid #ffcf5c55; border-radius: 999px;
-    padding: .3rem .7rem;
+    color: var(--amber); border: 1px solid #ffcf5c66; border-radius: 999px; padding: .3rem .7rem;
+    background: #0a0d15aa;
   }
   h1.mark {
-    font-size: clamp(2.4rem, 7.5vw, 4.2rem); line-height: .96; margin: 0;
+    font-size: clamp(2.5rem, 8vw, 4.4rem); line-height: .96; margin: 0;
     font-weight: 800; letter-spacing: .02em;
-    background: linear-gradient(92deg, var(--cyan), #a9e8ff 40%, var(--magenta));
+    background: linear-gradient(92deg, var(--cyan), #a9e8ff 42%, var(--magenta));
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 0 40px #4fd0ff22;
   }
-  .tag { font-size: clamp(1.05rem, 2.6vw, 1.4rem); color: var(--ink); margin: .2rem 0 .4rem; font-weight: 600; }
-  .sub { color: var(--dim); max-width: 48ch; margin: 0 0 2rem; }
-
-  .layout { display: grid; grid-template-columns: 1.1fr .9fr; gap: 2.5rem; align-items: start; }
-  @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } .shot { order: -1; } }
-
-  .shot { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
-          box-shadow: 0 24px 60px #000a; }
-  .shot img { width: 100%; height: auto; }
-  .shot figcaption {
-    position: absolute; left: 0; right: 0; bottom: 0; margin: 0;
-    background: linear-gradient(0deg, #060912ee, transparent);
-    padding: 1.4rem .9rem .7rem; font-size: .74rem; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--dim);
-  }
+  .tag { font-size: clamp(1.1rem, 2.8vw, 1.5rem); margin: .35rem 0 .5rem; font-weight: 600; }
+  .sub { color: var(--dim); max-width: 50ch; margin: 0; }
 
   h2 {
     font-size: .82rem; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan);
     margin: 3rem 0 1.1rem;
   }
-  .loop { list-style: none; padding: 0; margin: 0; display: grid; gap: .55rem; }
+  .loop { list-style: none; padding: 0; margin: 0; display: grid; gap: .6rem; }
   .loop li { display: flex; gap: .8rem; align-items: baseline; }
   .loop b {
     flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center;
     font-size: .8rem; border-radius: 6px; background: #4fd0ff1c; color: var(--cyan); font-weight: 700;
   }
-  .loop span { color: var(--ink); }
   .loop small { color: var(--dim); }
 
-  .strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: .8rem; }
-  @media (max-width: 620px) { .strip { grid-template-columns: repeat(3, 1fr); } }
-  .strip figure { margin: 0; text-align: center; }
-  .strip img {
-    width: 100%; border-radius: 12px; border: 1px solid var(--line); background: #05070d;
-    aspect-ratio: 1 / 1; object-fit: cover;
-  }
-  .strip figcaption { font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-top: .45rem; }
-
-  .units { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; }
-  @media (max-width: 620px) { .units { grid-template-columns: repeat(2, 1fr); } }
-  .units figure { margin: 0; }
-  .units img { width: 100%; border-radius: 12px; border: 1px solid var(--line); aspect-ratio: 1 / 1; object-fit: cover; }
-  .units figcaption { font-size: .78rem; color: var(--ink); margin-top: .4rem; }
-  .units small { color: var(--dim); }
+  .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+  @media (max-width: 640px) { .themes { grid-template-columns: repeat(2, 1fr); } }
+  .themes figure { margin: 0; }
+  .themes img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+  .themes figcaption { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: .4rem; }
 
   .feat { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
           border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
@@ -104,82 +89,67 @@
   .feat h3 { margin: 0 0 .2rem; font-size: .95rem; color: var(--ink); }
   .feat p { margin: 0; font-size: .88rem; color: var(--dim); }
 
-  .rule { color: var(--lime); font-weight: 600; }
-  .note { color: var(--dim); font-size: .8rem; margin-top: .8rem; }
+  .rule { color: var(--lime); font-weight: 600; margin-top: 1.6rem; }
 
   footer {
-    margin-top: 4rem; border-top: 1px solid var(--line); padding: 1.6rem 0 3rem;
+    margin-top: 3.5rem; border-top: 1px solid var(--line); padding: 1.6rem 0 3rem;
     color: var(--dim); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem;
   }
 </style>
 </head>
 <body>
-<div class="wrap">
 
   <header class="hero">
-    <div class="brandline">
-      <img src="assets/glyph.png" alt="NEON WARFARE emblem" width="60" height="60">
-      <span class="badge">Coming to Google&nbsp;Play · internal testing</span>
-    </div>
-    <h1 class="mark">NEON&nbsp;WARFARE</h1>
-    <p class="tag">Match-3 meets neon lane warfare.</p>
-    <p class="sub">A single-player strategy game that fuses a match-3 board with real-time
-      lane combat. Mine gems, deploy troops, seize the pylons, break the core.</p>
-
-    <div class="layout">
-      <div>
-        <h2>How it plays</h2>
-        <ol class="loop">
-          <li><b>1</b><span>Match gems on the board <small>— each colour mines one of five resources</small></span></li>
-          <li><b>2</b><span>Spend resources to deploy troops <small>— four ground lanes and the air lane</small></span></li>
-          <li><b>3</b><span>Push the frontline and capture the pylons <small>— hold them to power up</small></span></li>
-          <li><b>4</b><span>Trigger a SURGE, then destroy the enemy core <small>— before the timer runs out</small></span></li>
-        </ol>
+    <img class="bg" src="assets/hero_battlefield.jpg" alt="">
+    <div class="wrap inner">
+      <div class="brandline">
+        <img src="assets/glyph.png" alt="NEON WARFARE emblem" width="58" height="58">
+        <span class="badge">Coming to Google&nbsp;Play · internal testing</span>
       </div>
-
-      <figure class="shot" style="margin:0">
-        <img src="assets/troop_titan.png" alt="Titan siege unit — concept art" width="360" height="360">
-        <figcaption>Titan · siege class — concept art</figcaption>
-      </figure>
+      <h1 class="mark">NEON&nbsp;WARFARE</h1>
+      <p class="tag">Match-3 meets neon lane warfare.</p>
+      <p class="sub">A single-player strategy game that fuses a match-3 board with real-time
+        lane combat. Mine gems, deploy troops, seize the pylons, break the core.</p>
     </div>
   </header>
 
-  <h2>Five resources, mined from the board</h2>
-  <div class="strip">
-    <figure><img src="assets/gem_energy.png"  alt="Energy gem"  width="200" height="200"><figcaption>Energy</figcaption></figure>
-    <figure><img src="assets/gem_data.png"    alt="Data gem"    width="200" height="200"><figcaption>Data</figcaption></figure>
-    <figure><img src="assets/gem_nano.png"    alt="Nano gem"    width="200" height="200"><figcaption>Nano</figcaption></figure>
-    <figure><img src="assets/gem_plasma.png"  alt="Plasma gem"  width="200" height="200"><figcaption>Plasma</figcaption></figure>
-    <figure><img src="assets/gem_quantum.png" alt="Quantum gem" width="200" height="200"><figcaption>Quantum</figcaption></figure>
+  <div class="wrap">
+
+    <h2>How it plays</h2>
+    <ol class="loop">
+      <li><b>1</b><span>Match gems on the board <small>— each colour mines one of five resources</small></span></li>
+      <li><b>2</b><span>Spend resources to deploy troops <small>— four ground lanes and the air lane</small></span></li>
+      <li><b>3</b><span>Push the frontline and capture the pylons <small>— hold them to power up</small></span></li>
+      <li><b>4</b><span>Trigger a SURGE, then destroy the enemy core <small>— before the timer runs out</small></span></li>
+    </ol>
+
+    <h2>Eight battlefields, one per theme</h2>
+    <div class="themes">
+      <figure><img src="assets/theme_cyber.jpg"  alt="Cyber battlefield">      <figcaption>Cyber</figcaption></figure>
+      <figure><img src="assets/theme_sakura.jpg" alt="Sakura battlefield">     <figcaption>Sakura</figcaption></figure>
+      <figure><img src="assets/theme_solar.jpg"  alt="Solar Forge battlefield"><figcaption>Solar&nbsp;Forge</figcaption></figure>
+      <figure><img src="assets/theme_ghost.jpg"  alt="Ghost battlefield">      <figcaption>Ghost</figcaption></figure>
+    </div>
+
+    <h2>What's in it</h2>
+    <div class="feat">
+      <div><h3>20-level campaign</h3><p>Three acts with a rising difficulty curve and a director that adapts to you.</p></div>
+      <div><h3>Nine unit types</h3><p>Ground, air and siege, tied together by a rock-paper-scissors class triangle.</p></div>
+      <div><h3>Crossover strikes</h3><p>Big matches on the board fire lasers, orbital hits, EMP and shockwaves into the battlefield.</p></div>
+      <div><h3>Ghost ladder</h3><p>Every match is recorded as a “ghost” and replayed as your opponent. Climb a daily skill-rated leaderboard against other players' runs.</p></div>
+      <div><h3>Themes &amp; cosmetics</h3><p>Eight colour themes and unlockable board skins — bought only with tokens you earn by playing.</p></div>
+      <div><h3>Plays offline</h3><p>The whole campaign runs with no connection. The online leaderboard is optional.</p></div>
+    </div>
+
+    <p class="rule">No ads. No in-app purchases. No third-party tracking.</p>
+
+    <footer>
+      <span>Single-player strategy · Android</span>
+      <span><a href="privacy-notice/">Privacy policy</a></span>
+      <span><a href="mailto:infernalzeus69@gmail.com">infernalzeus69@gmail.com</a></span>
+    </footer>
+
   </div>
 
-  <h2>Some of the roster</h2>
-  <div class="units">
-    <figure><img src="assets/troop_trooper.png" alt="Trooper" width="360" height="360"><figcaption>Trooper <small>— core ground</small></figcaption></figure>
-    <figure><img src="assets/troop_interceptor.png" alt="Interceptor" width="360" height="360"><figcaption>Interceptor <small>— the only air unit</small></figcaption></figure>
-    <figure><img src="assets/troop_turret.png" alt="Turret" width="360" height="360"><figcaption>Turret <small>— anti-air, immobile</small></figcaption></figure>
-    <figure><img src="assets/troop_drone.png" alt="Drone" width="360" height="360"><figcaption>Drone <small>— fast harasser</small></figcaption></figure>
-  </div>
-  <p class="note">Concept art. Nine unit types in all, tied together by a rock-paper-scissors class triangle.</p>
-
-  <h2>What's in it</h2>
-  <div class="feat">
-    <div><h3>20-level campaign</h3><p>Three acts with a rising difficulty curve and a director that adapts to you.</p></div>
-    <div><h3>Nine unit types</h3><p>Ground, air and siege, tied together by a rock-paper-scissors class triangle.</p></div>
-    <div><h3>Crossover strikes</h3><p>Big matches on the board fire lasers, orbital hits, EMP and shockwaves into the battlefield.</p></div>
-    <div><h3>Ghost ladder</h3><p>Every match is recorded as a “ghost” and replayed as your opponent. Climb a daily skill-rated leaderboard against other players' runs.</p></div>
-    <div><h3>Themes &amp; cosmetics</h3><p>Five colour themes and unlockable board skins — bought only with tokens you earn by playing.</p></div>
-    <div><h3>Plays offline</h3><p>The whole campaign runs with no connection. The online leaderboard is optional.</p></div>
-  </div>
-
-  <p style="margin-top:1.6rem" class="rule">No ads. No in-app purchases. No third-party tracking.</p>
-
-  <footer>
-    <span>Single-player strategy · Android</span>
-    <span><a href="privacy-notice/">Privacy policy</a></span>
-    <span><a href="mailto:infernalzeus69@gmail.com">infernalzeus69@gmail.com</a></span>
-  </footer>
-
-</div>
 </body>
 </html>
