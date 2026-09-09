@@ -4,91 +4,74 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEON WARFARE</title>
-<meta name="description" content="NEON WARFARE — a single-player strategy game that fuses a match-3 board with real-time lane combat. Android.">
+<meta name="description" content="NEON WARFARE - a single-player strategy game that fuses a match-3 board with real-time lane combat. Android.">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="favicon.png">
 <meta property="og:title" content="NEON WARFARE">
-<meta property="og:description" content="Match-3 meets neon lane warfare. Mine gems, deploy troops, seize the pylons, break the core.">
+<meta property="og:description" content="Match-3 meets neon lane warfare.">
 <meta property="og:image" content="assets/glyph.png">
 <style>
   :root {
-    --bg: #070a12;
-    --bg2: #0d1322;
-    --ink: #dbe4f3;
-    --dim: #8794ac;
-    --cyan: #4fd0ff;
-    --magenta: #ff5cc8;
-    --lime: #7dffb2;
-    --amber: #ffcf5c;
-    --line: #ffffff1a;
+    --bg-deep:#050D1C; --panel:#0B1828; --bf-bg:#102234;
+    --accent:#00C8FF; --accent2:#004466; --troop:#8CF2FF; --enemy:#FF6633;
+    --ink:#D0EEFF; --dim:#6AAABB; --line:#ffffff1a;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
   body {
-    margin: 0;
-    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    -webkit-font-smoothing: antialiased;
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg-deep); color:var(--ink);
+    -webkit-font-smoothing:antialiased; transition:background .25s,color .25s;
   }
-  a { color: var(--cyan); }
-  img { max-width: 100%; display: block; }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
+  a { color:var(--accent); }
+  img { max-width:100%; display:block; }
+  .wrap { max-width:1000px; margin:0 auto; padding:0 1.25rem; }
 
-  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
-  .hero .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .40; }
-  .hero::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, #070a1266 0%, #070a12dd 78%, var(--bg) 100%);
-  }
-  .hero .inner { position: relative; z-index: 1; padding: 4rem 0 3rem; }
-  .brandline { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
-  .brandline img { width: 58px; height: 58px; filter: drop-shadow(0 0 18px #4fd0ff66); }
-  .badge {
-    display: inline-block; font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
-    color: var(--amber); border: 1px solid #ffcf5c66; border-radius: 999px; padding: .3rem .7rem;
-    background: #0a0d15aa;
-  }
-  h1.mark {
-    font-size: clamp(2.5rem, 8vw, 4.4rem); line-height: .96; margin: 0;
-    font-weight: 800; letter-spacing: .02em;
-    background: linear-gradient(92deg, var(--cyan), #a9e8ff 42%, var(--magenta));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .tag { font-size: clamp(1.1rem, 2.8vw, 1.5rem); margin: .35rem 0 .5rem; font-weight: 600; }
-  .sub { color: var(--dim); max-width: 50ch; margin: 0; }
+  .hero { position:relative; overflow:hidden; border-bottom:1px solid var(--line); }
+  .hero .bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.22; }
+  .hero::after { content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg,transparent 0%,var(--bg-deep) 94%); }
+  .hero .inner { position:relative; z-index:1; padding:3.5rem 0 2rem; }
+  .brandline { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; }
+  .brandline img { width:56px; height:56px; filter:drop-shadow(0 0 16px var(--accent)); }
+  .badge { display:inline-block; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:.3rem .7rem;
+    background:#00000033; }
+  h1.mark { font-size:clamp(2.4rem,8vw,4.2rem); line-height:.96; margin:.4rem 0 0; font-weight:800;
+    letter-spacing:.02em; color:var(--accent); text-shadow:0 0 34px var(--accent); }
+  .tag { font-size:clamp(1.05rem,2.7vw,1.4rem); margin:.35rem 0 .4rem; font-weight:600; }
+  .sub { color:var(--dim); max-width:52ch; margin:0; }
 
-  h2 {
-    font-size: .82rem; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan);
-    margin: 3rem 0 1.1rem;
-  }
-  .loop { list-style: none; padding: 0; margin: 0; display: grid; gap: .6rem; }
-  .loop li { display: flex; gap: .8rem; align-items: baseline; }
-  .loop b {
-    flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center;
-    font-size: .8rem; border-radius: 6px; background: #4fd0ff1c; color: var(--cyan); font-weight: 700;
-  }
-  .loop small { color: var(--dim); }
+  .stage { display:grid; grid-template-columns:300px 1fr; gap:2.5rem; align-items:start; padding:2.5rem 0; }
+  @media (max-width:820px) { .stage { grid-template-columns:1fr; } .demo { order:-1; margin:0 auto; } }
+  .demo { width:300px; }
+  .screen { width:100%; height:auto; border-radius:22px;
+    box-shadow:0 24px 60px #000a, 0 0 0 1px var(--line); display:block; }
+  .themebar { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:1rem; }
+  .tbtn { font:inherit; font-size:.66rem; letter-spacing:.06em; text-transform:uppercase;
+    padding:.35rem .5rem; border-radius:7px; cursor:pointer;
+    background:#ffffff0d; color:var(--dim); border:1px solid var(--line); transition:.15s; }
+  .tbtn::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--c); margin-right:.4rem; vertical-align:middle; box-shadow:0 0 6px var(--c); }
+  .tbtn[aria-pressed="true"] { color:var(--ink); border-color:var(--c); background:#ffffff14; }
 
-  .economy { display: flex; gap: 1.4rem; align-items: center;
-             background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 1.4rem; }
-  .economy svg { flex: none; width: 84px; height: 84px; filter: drop-shadow(0 0 14px #ffcf5c44); }
-  .economy p { margin: 0; color: var(--dim); }
-  .economy strong { color: var(--ink); }
-  @media (max-width: 480px) { .economy { flex-direction: column; text-align: center; } }
+  h2 { font-size:.8rem; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:2.6rem 0 1rem; }
+  .loop { list-style:none; padding:0; margin:0; display:grid; gap:.55rem; }
+  .loop li { display:flex; gap:.75rem; align-items:baseline; }
+  .loop b { flex:none; width:1.5rem; height:1.5rem; display:grid; place-items:center; font-size:.78rem;
+    border-radius:6px; background:#ffffff14; color:var(--accent); font-weight:700; }
+  .loop small { color:var(--dim); }
 
-  .feat { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
-          border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  @media (max-width: 560px) { .feat { grid-template-columns: 1fr; } }
-  .feat div { background: var(--bg2); padding: 1rem 1.1rem; }
-  .feat h3 { margin: 0 0 .2rem; font-size: .95rem; color: var(--ink); }
-  .feat p { margin: 0; font-size: .88rem; color: var(--dim); }
+  .feat { display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  @media (max-width:560px) { .feat { grid-template-columns:1fr; } }
+  .feat div { background:var(--panel); padding:1rem 1.1rem; }
+  .feat h3 { margin:0 0 .2rem; font-size:.95rem; color:var(--ink); }
+  .feat p { margin:0; font-size:.88rem; color:var(--dim); }
 
-  .rule { color: var(--lime); font-weight: 600; margin-top: 1.6rem; }
-
-  footer {
-    margin-top: 3.5rem; border-top: 1px solid var(--line); padding: 1.6rem 0 3rem;
-    color: var(--dim); font-size: .86rem; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem;
-  }
+  .rule { color:var(--accent); font-weight:600; margin-top:1.5rem; }
+  footer { margin-top:3rem; border-top:1px solid var(--line); padding:1.5rem 0 3rem;
+    color:var(--dim); font-size:.85rem; display:flex; flex-wrap:wrap; gap:.4rem 1.4rem; }
 </style>
 </head>
 <body>
@@ -97,8 +80,8 @@
     <img class="bg" src="assets/hero_battlefield.jpg" alt="">
     <div class="wrap inner">
       <div class="brandline">
-        <img src="assets/glyph.png" alt="NEON WARFARE emblem" width="58" height="58">
-        <span class="badge">Coming to Google&nbsp;Play · internal testing</span>
+        <img src="assets/glyph.png" alt="NEON WARFARE emblem" width="56" height="56">
+        <span class="badge">Coming to Google&nbsp;Play</span>
       </div>
       <h1 class="mark">NEON&nbsp;WARFARE</h1>
       <p class="tag">Match-3 meets neon lane warfare.</p>
@@ -108,56 +91,79 @@
   </header>
 
   <div class="wrap">
-
-    <h2>How it plays</h2>
-    <ol class="loop">
-      <li><b>1</b><span>Match gems on the board <small>— each colour mines one of five resources</small></span></li>
-      <li><b>2</b><span>Spend resources to deploy troops <small>— four ground lanes and the air lane</small></span></li>
-      <li><b>3</b><span>Push the frontline and capture the pylons <small>— hold them to power up</small></span></li>
-      <li><b>4</b><span>Trigger a SURGE, then destroy the enemy core <small>— before the timer runs out</small></span></li>
-    </ol>
-
-    <h2>The armory runs on tokens</h2>
-    <div class="economy">
-      <!-- the in-game token: three gold shards locked around a blue spark (NeonArt.BuildTokenIcon) -->
-      <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Armory token">
-        <defs>
-          <radialGradient id="spark" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stop-color="#f2fcff"/>
-            <stop offset=".28" stop-color="#6dccff" stop-opacity=".9"/>
-            <stop offset="1" stop-color="#6dccff" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <circle cx="64" cy="64" r="16" fill="url(#spark)"/>
-        <polygon points="66,64 83.3,56.9 83.3,71.1" fill="#e9c053" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
-        <polygon points="63,65.7 60.5,84.3 48.2,77.2" fill="#fff0bd" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
-        <polygon points="63,62.3 48.2,50.8 60.5,43.7" fill="#ecc65f" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
-        <circle cx="64" cy="64" r="3.4" fill="#f2fcff"/>
-      </svg>
-      <p><strong>Tokens</strong> are earned by finishing levels and by converting spare gems.
-        They buy board skins, gem trails and card frames in the armory — and nothing else.
-        There is no real-money currency and nothing to buy with cash.</p>
+    <div class="stage">
+      <div class="demo">
+        <svg viewBox="0 0 320 640" xmlns="http://www.w3.org/2000/svg" class="screen" role="img" aria-label="NEON WARFARE battle screen">
+<defs><radialGradient id="glow-energy"><stop offset="0" stop-color="#FFBF1A" stop-opacity=".45"/><stop offset="1" stop-color="#FFBF1A" stop-opacity="0"/></radialGradient><radialGradient id="glow-plasma"><stop offset="0" stop-color="#E61ACC" stop-opacity=".45"/><stop offset="1" stop-color="#E61ACC" stop-opacity="0"/></radialGradient><radialGradient id="glow-nano"><stop offset="0" stop-color="#1AE666" stop-opacity=".45"/><stop offset="1" stop-color="#1AE666" stop-opacity="0"/></radialGradient><radialGradient id="glow-quantum"><stop offset="0" stop-color="#1AB3FF" stop-opacity=".45"/><stop offset="1" stop-color="#1AB3FF" stop-opacity="0"/></radialGradient><radialGradient id="glow-data"><stop offset="0" stop-color="#CCD9F2" stop-opacity=".45"/><stop offset="1" stop-color="#CCD9F2" stop-opacity="0"/></radialGradient><radialGradient id="spark"><stop offset="0" stop-color="#f2fcff"/><stop offset=".3" stop-color="#6dccff" stop-opacity=".9"/><stop offset="1" stop-color="#6dccff" stop-opacity="0"/></radialGradient><symbol id="gem-energy" viewBox="0 0 64 64"><circle cx="32.0" cy="32.0" r="10.0" fill="url(#glow-energy)"/><polygon points="32.0,20.0 42.4,26.0 42.4,38.0 32.0,44.0 21.6,38.0 21.6,26.0" fill="#61490A" fill-opacity="0.95"/><polygon points="32.0,32.0 32.0,21.0 41.5,26.5" fill="#ECB62A" fill-opacity="0.94"/><polygon points="32.0,32.0 41.5,26.5 41.5,37.5" fill="#88660E" fill-opacity="0.94"/><polygon points="32.0,32.0 41.5,37.5 32.0,43.0" fill="#664C0A" fill-opacity="0.94"/><polygon points="32.0,32.0 32.0,43.0 22.5,37.5" fill="#C49214" fill-opacity="0.94"/><polygon points="32.0,32.0 22.5,37.5 22.5,26.5" fill="#F8C74A" fill-opacity="0.94"/><polygon points="32.0,32.0 22.5,26.5 32.0,21.0" fill="#FED15D" fill-opacity="0.94"/><polygon points="32.0,32.0 32.0,25.5 37.6,28.8" fill="#ECB62A" fill-opacity="0.5"/><polygon points="32.0,32.0 37.6,28.8 37.6,35.2" fill="#88660E" fill-opacity="0.5"/><polygon points="32.0,32.0 37.6,35.2 32.0,38.5" fill="#664C0A" fill-opacity="0.5"/><polygon points="32.0,32.0 32.0,38.5 26.4,35.2" fill="#C49214" fill-opacity="0.5"/><polygon points="32.0,32.0 26.4,35.2 26.4,28.8" fill="#F8C74A" fill-opacity="0.5"/><polygon points="32.0,32.0 26.4,28.8 32.0,25.5" fill="#FED15D" fill-opacity="0.5"/><line x1="24.5" y1="40.5" x2="36.5" y2="25.5" stroke="#fff" stroke-width="0.6" stroke-linecap="round" opacity="0.2"/><line x1="29.0" y1="42.0" x2="39.0" y2="29.0" stroke="#fff" stroke-width="0.4" stroke-linecap="round" opacity="0.13"/><line x1="41.5" y1="37.5" x2="32.0" y2="43.0" stroke="#FFDC83" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/><line x1="32.0" y1="43.0" x2="22.5" y2="37.5" stroke="#FFDC83" stroke-width="1.1" stroke-linecap="round" opacity="0.65"/><line x1="22.5" y1="37.5" x2="22.5" y2="26.5" stroke="#FFDC83" stroke-width="0.7" stroke-linecap="round" opacity="0.25"/><circle cx="32.0" cy="32.0" r="2.5" fill="#fff" fill-opacity=".42"/><circle cx="28.5" cy="28.0" r="1.8" fill="#fff" fill-opacity=".62"/></symbol><symbol id="gem-plasma" viewBox="0 0 64 64"><circle cx="32.0" cy="32.0" r="10.0" fill="url(#glow-plasma)"/><polygon points="32.0,19.5 35.7,28.3 44.5,32.0 35.7,35.7 32.0,44.5 28.3,35.7 19.5,32.0 28.3,28.3" fill="#570A4E" fill-opacity="0.92"/><polygon points="32.0,20.5 35.2,28.8 43.5,32.0 35.2,35.2 32.0,43.5 28.8,35.2 20.5,32.0 28.8,28.8" fill="#981187" fill-opacity="0.96"/><polygon points="31.5,22.5 33.8,29.2 40.5,31.5 33.8,33.8 31.5,40.5 29.2,33.8 22.5,31.5 29.2,29.2" fill="#EE5FDB" fill-opacity="0.32"/><polygon points="32.0,25.0 33.9,30.1 39.0,32.0 33.9,33.9 32.0,39.0 30.1,33.9 25.0,32.0 30.1,30.1" fill="#EE5FDB" fill-opacity="0.72"/><line x1="32.0" y1="21.5" x2="32.0" y2="42.5" stroke="#fff" stroke-width="0.5" stroke-linecap="round" opacity="0.18"/><line x1="21.5" y1="32.0" x2="42.5" y2="32.0" stroke="#fff" stroke-width="0.5" stroke-linecap="round" opacity="0.18"/><line x1="30.0" y1="20.5" x2="34.0" y2="24.5" stroke="#F283E3" stroke-width="1.1" stroke-linecap="round" opacity="0.75"/><line x1="20.5" y1="30.0" x2="24.5" y2="34.0" stroke="#F283E3" stroke-width="1.0" stroke-linecap="round" opacity="0.68"/><line x1="34.0" y1="20.5" x2="39.5" y2="30.0" stroke="#F283E3" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/><circle cx="32.0" cy="32.0" r="2.5" fill="#fff" fill-opacity=".42"/><circle cx="28.5" cy="28.0" r="1.8" fill="#fff" fill-opacity=".62"/></symbol><symbol id="gem-nano" viewBox="0 0 64 64"><circle cx="32.0" cy="32.0" r="10.0" fill="url(#glow-nano)"/><polygon points="32.0,44.5 21.2,25.8 42.8,25.7" fill="#0A5727" fill-opacity="0.92"/><polygon points="32.0,32.0 32.0,43.5 22.0,26.2" fill="#2AD76A" fill-opacity="0.92"/><polygon points="32.0,32.0 22.0,26.2 42.0,26.2" fill="#4AE584" fill-opacity="0.92"/><polygon points="32.0,32.0 42.0,26.2 32.0,43.5" fill="#0A5B29" fill-opacity="0.92"/><polygon points="32.0,32.0 32.0,38.5 26.4,28.8" fill="#2AD76A" fill-opacity="0.48"/><polygon points="32.0,32.0 26.4,28.8 37.6,28.7" fill="#4AE584" fill-opacity="0.48"/><polygon points="32.0,32.0 37.6,28.7 32.0,38.5" fill="#0A5B29" fill-opacity="0.48"/><circle cx="32.0" cy="42.0" r="1.9" fill="#5FEE94" fill-opacity=".92"/><circle cx="23.3" cy="27.0" r="1.9" fill="#5FEE94" fill-opacity=".92"/><circle cx="40.7" cy="27.0" r="1.9" fill="#5FEE94" fill-opacity=".92"/><line x1="25.5" y1="37.5" x2="36.5" y2="24.5" stroke="#fff" stroke-width="0.5" stroke-linecap="round" opacity="0.18"/><line x1="22.0" y1="26.2" x2="42.0" y2="26.2" stroke="#83F2AC" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/><line x1="22.0" y1="26.2" x2="32.0" y2="43.5" stroke="#83F2AC" stroke-width="1.0" stroke-linecap="round" opacity="0.55"/><circle cx="32.0" cy="32.0" r="2.5" fill="#fff" fill-opacity=".42"/><circle cx="28.5" cy="28.0" r="1.8" fill="#fff" fill-opacity=".62"/></symbol><symbol id="gem-quantum" viewBox="0 0 64 64"><circle cx="32.0" cy="32.0" r="10.0" fill="url(#glow-quantum)"/><circle cx="32.0" cy="32.0" r="10.0" fill="#0A4461" fill-opacity=".92"/><circle cx="32.0" cy="32.0" r="9.0" fill="#1176A8" fill-opacity=".95"/><polygon points="32.0,32.0 41.0,32.0 40.3,35.4" fill="#0C5477" fill-opacity="0.78"/><polygon points="32.0,32.0 40.3,35.4 38.4,38.4" fill="#0A4664" fill-opacity="0.78"/><polygon points="32.0,32.0 38.4,38.4 35.4,40.3" fill="#0A4664" fill-opacity="0.78"/><polygon points="32.0,32.0 35.4,40.3 32.0,41.0" fill="#0C5477" fill-opacity="0.78"/><polygon points="32.0,32.0 32.0,41.0 28.6,40.3" fill="#106D9C" fill-opacity="0.78"/><polygon points="32.0,32.0 28.6,40.3 25.6,38.4" fill="#148FCC" fill-opacity="0.78"/><polygon points="32.0,32.0 25.6,38.4 23.7,35.4" fill="#25A9EB" fill-opacity="0.78"/><polygon points="32.0,32.0 23.7,35.4 23.0,32.0" fill="#3FB8F4" fill-opacity="0.78"/><polygon points="32.0,32.0 23.0,32.0 23.7,28.6" fill="#53C3FB" fill-opacity="0.78"/><polygon points="32.0,32.0 23.7,28.6 25.6,25.6" fill="#5EC9FF" fill-opacity="0.78"/><polygon points="32.0,32.0 25.6,25.6 28.6,23.7" fill="#5EC9FF" fill-opacity="0.78"/><polygon points="32.0,32.0 28.6,23.7 32.0,23.0" fill="#53C3FB" fill-opacity="0.78"/><polygon points="32.0,32.0 32.0,23.0 35.4,23.7" fill="#3FB8F4" fill-opacity="0.78"/><polygon points="32.0,32.0 35.4,23.7 38.4,25.6" fill="#25A9EB" fill-opacity="0.78"/><polygon points="32.0,32.0 38.4,25.6 40.3,28.6" fill="#148FCC" fill-opacity="0.78"/><polygon points="32.0,32.0 40.3,28.6 41.0,32.0" fill="#106D9C" fill-opacity="0.78"/><circle cx="32.0" cy="32.0" r="5.5" fill="#5FCAFF" fill-opacity=".48"/><circle cx="32.0" cy="32.0" r="13.5" fill="none" stroke="#1AB3FF" stroke-width="0.9" opacity=".72"/><circle cx="45.5" cy="32.0" r="1.9" fill="#5FCAFF" fill-opacity=".92"/><line x1="38.6" y1="38.6" x2="35.6" y2="40.7" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.0975"/><line x1="35.6" y1="40.7" x2="32.0" y2="41.4" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.2925"/><line x1="32.0" y1="41.4" x2="28.4" y2="40.7" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.48750000000000004"/><line x1="28.4" y1="40.7" x2="25.4" y2="38.6" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.6824999999999999"/><line x1="25.4" y1="38.6" x2="23.3" y2="35.6" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.6824999999999999"/><line x1="23.3" y1="35.6" x2="22.6" y2="32.0" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.4875000000000002"/><line x1="22.6" y1="32.0" x2="23.3" y2="28.4" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.2924999999999999"/><line x1="23.3" y1="28.4" x2="25.4" y2="25.4" stroke="#83D6FF" stroke-width="1.2" stroke-linecap="round" opacity="0.09750000000000009"/><circle cx="32.0" cy="32.0" r="2.5" fill="#fff" fill-opacity=".42"/><circle cx="28.5" cy="28.0" r="1.8" fill="#fff" fill-opacity=".62"/></symbol><symbol id="gem-data" viewBox="0 0 64 64"><circle cx="32.0" cy="32.0" r="10.0" fill="url(#glow-data)"/><rect x="22.5" y="22.5" width="19.0" height="19.0" fill="#4E525C" fill-opacity=".94"/><rect x="23.5" y="23.5" width="17.0" height="17.0" fill="#878FA0" fill-opacity=".96"/><polygon points="23.5,23.5 40.5,23.5 23.5,40.5" fill="#DBE4F6" fill-opacity="0.3"/><polygon points="23.5,23.5 40.5,23.5 32.0,32.0" fill="#CFD8EC" fill-opacity="0.5"/><line x1="27.8" y1="23.5" x2="27.8" y2="40.5" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><line x1="23.5" y1="27.8" x2="40.5" y2="27.8" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><line x1="32.0" y1="23.5" x2="32.0" y2="40.5" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><line x1="23.5" y1="32.0" x2="40.5" y2="32.0" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><line x1="36.2" y1="23.5" x2="36.2" y2="40.5" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><line x1="23.5" y1="36.2" x2="40.5" y2="36.2" stroke="#6A707E" stroke-width="0.4" stroke-linecap="round" opacity="0.6"/><rect x="27.5" y="27.5" width="9.0" height="9.0" fill="#DBE4F6" fill-opacity=".62"/><line x1="25.0" y1="39.0" x2="39.0" y2="25.0" stroke="#fff" stroke-width="0.6" stroke-linecap="round" opacity="0.18"/><line x1="23.5" y1="23.5" x2="40.5" y2="23.5" stroke="#E3EAF8" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/><line x1="23.5" y1="23.5" x2="23.5" y2="40.5" stroke="#E3EAF8" stroke-width="1.1" stroke-linecap="round" opacity="0.68"/><circle cx="32.0" cy="32.0" r="2.5" fill="#fff" fill-opacity=".42"/><circle cx="28.5" cy="28.0" r="1.8" fill="#fff" fill-opacity=".62"/></symbol><symbol id="unit-trooper" viewBox="0 0 40 40"><g stroke="#0a0a12" stroke-width="2.4" stroke-linejoin="round"><path d="M20 6 l5 4 v9 l4 3 v6 l-3 2 v6 h-4 v-6 h-4 v6 h-4 v-6 l-3-2 v-6 l4-3 V10 z" fill="var(--ut)"/><rect x="24" y="12" width="12" height="3" fill="var(--ut)"/><circle cx="20" cy="12" r="2" fill="#fff"/></g></symbol><symbol id="unit-drone" viewBox="0 0 40 40"><g stroke="#0a0a12" stroke-width="2.4" stroke-linejoin="round"><path d="M8 20 q12-11 24 0 q-12 8-24 0 z" fill="var(--ut)"/><circle cx="20" cy="19" r="4" fill="#0a0a12"/><circle cx="20" cy="19" r="2" fill="#fff"/><path d="M6 20 h-4 M34 20 h4" stroke="var(--ut)"/></g></symbol><symbol id="unit-turret" viewBox="0 0 40 40"><g stroke="#0a0a12" stroke-width="2.4" stroke-linejoin="round"><path d="M9 32 h22 l-3-8 h-16 z" fill="var(--ut)"/><circle cx="20" cy="20" r="7" fill="var(--ut)"/><rect x="20" y="17" width="15" height="5" fill="var(--ut)"/><circle cx="20" cy="20" r="2.5" fill="#fff"/></g></symbol></defs>
+<rect x="3" y="3" width="314" height="634" rx="24" fill="var(--bg-deep)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="46" y="12" width="262" height="198" rx="6" fill="var(--bf-bg)"/><line x1="52.0" y1="28.0" x2="302.0" y2="28.0" stroke="var(--accent)" stroke-width="1.0" stroke-dasharray="4 4" opacity="0.5"/><line x1="52" y1="82" x2="302" y2="82" stroke="#ffffff12" stroke-width="1"/><line x1="52" y1="112" x2="302" y2="112" stroke="#ffffff12" stroke-width="1"/><line x1="52" y1="142" x2="302" y2="142" stroke="#ffffff12" stroke-width="1"/><line x1="52" y1="172" x2="302" y2="172" stroke="#ffffff12" stroke-width="1"/><path d="M52,162 L116,132 L166,152 L226,120 L302,144" fill="none" stroke="var(--accent)" stroke-width="2" opacity=".85"/><circle cx="141" cy="108" r="9" fill="none" stroke="var(--troop)" stroke-width="2.4"/><circle cx="234" cy="108" r="9" fill="none" stroke="var(--enemy)" stroke-width="2.4"/><rect x="50" y="90" width="10" height="40" rx="3" fill="var(--troop)"/><rect x="294" y="90" width="10" height="40" rx="3" fill="var(--enemy)"/><g style="--ut:var(--troop)" transform="translate(94,70)"><use href="#unit-trooper" width="26" height="26"/></g><g style="--ut:var(--troop)" transform="translate(116,130)"><use href="#unit-drone" width="26" height="26"/></g><g style="--ut:var(--troop)" transform="translate(68,162)"><use href="#unit-turret" width="26" height="26"/></g><g style="--ut:var(--enemy)" transform="translate(264,70) scale(-1,1)"><use href="#unit-trooper" width="26" height="26"/></g><g style="--ut:var(--enemy)" transform="translate(248,130) scale(-1,1)"><use href="#unit-drone" width="26" height="26"/></g>
+<rect x="46" y="220" width="262" height="44" rx="6" fill="var(--panel)"/><rect x="54" y="228" width="42" height="28" rx="5" fill="#ffffff0d" stroke="#ffffff1f"/><use href="#gem-energy" x="65" y="228" width="20" height="20"/><rect x="104" y="228" width="42" height="28" rx="5" fill="#ffffff0d" stroke="#ffffff1f"/><use href="#gem-plasma" x="115" y="228" width="20" height="20"/><rect x="154" y="228" width="42" height="28" rx="5" fill="#ffffff0d" stroke="#ffffff1f"/><use href="#gem-nano" x="165" y="228" width="20" height="20"/><rect x="204" y="228" width="42" height="28" rx="5" fill="#ffffff0d" stroke="#ffffff1f"/><use href="#gem-quantum" x="215" y="228" width="20" height="20"/><rect x="254" y="228" width="42" height="28" rx="5" fill="#ffffff0d" stroke="#ffffff1f"/><use href="#gem-data" x="265" y="228" width="20" height="20"/>
+<rect x="10" y="12" width="30" height="252" rx="6" fill="var(--panel)"/><g transform="translate(25,32) scale(0.5)"><circle cx="0" cy="0" r="15" fill="url(#spark)"/><polygon points="2,0 19.3,-7.1 19.3,7.1" fill="#e9c053" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/><polygon points="-1,1.7 -3.5,20.3 -15.8,13.2" fill="#fff0bd" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/><polygon points="-1,-1.7 -15.8,-13.2 -3.5,-20.3" fill="#ecc65f" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/><circle cx="0" cy="0" r="3.4" fill="#f2fcff"/></g><use href="#gem-energy" x="14" y="62" width="22" height="22"/><rect x="14" y="86" width="22" height="3" rx="1.5" fill="#ffffff22"/><use href="#gem-plasma" x="14" y="100" width="22" height="22"/><rect x="14" y="124" width="22" height="3" rx="1.5" fill="#ffffff22"/><use href="#gem-nano" x="14" y="138" width="22" height="22"/><rect x="14" y="162" width="22" height="3" rx="1.5" fill="#ffffff22"/><use href="#gem-quantum" x="14" y="176" width="22" height="22"/><rect x="14" y="200" width="22" height="3" rx="1.5" fill="#ffffff22"/><use href="#gem-data" x="14" y="214" width="22" height="22"/><rect x="14" y="238" width="22" height="3" rx="1.5" fill="#ffffff22"/>
+<rect x="47" y="271" width="262" height="334" rx="8" fill="var(--bf-bg)" stroke="#ffffff12"/><use href="#gem-quantum" x="55.0" y="279.0" width="30" height="30"/><use href="#gem-data" x="91.0" y="279.0" width="30" height="30"/><use href="#gem-quantum" x="127.0" y="279.0" width="30" height="30"/><use href="#gem-quantum" x="163.0" y="279.0" width="30" height="30"/><use href="#gem-data" x="199.0" y="279.0" width="30" height="30"/><use href="#gem-data" x="235.0" y="279.0" width="30" height="30"/><use href="#gem-plasma" x="271.0" y="279.0" width="30" height="30"/><use href="#gem-plasma" x="55.0" y="315.0" width="30" height="30"/><use href="#gem-data" x="91.0" y="315.0" width="30" height="30"/><use href="#gem-quantum" x="127.0" y="315.0" width="30" height="30"/><use href="#gem-data" x="163.0" y="315.0" width="30" height="30"/><use href="#gem-plasma" x="199.0" y="315.0" width="30" height="30"/><use href="#gem-energy" x="235.0" y="315.0" width="30" height="30"/><use href="#gem-quantum" x="271.0" y="315.0" width="30" height="30"/><use href="#gem-nano" x="55.0" y="351.0" width="30" height="30"/><use href="#gem-plasma" x="91.0" y="351.0" width="30" height="30"/><use href="#gem-energy" x="127.0" y="351.0" width="30" height="30"/><use href="#gem-data" x="163.0" y="351.0" width="30" height="30"/><use href="#gem-energy" x="199.0" y="351.0" width="30" height="30"/><use href="#gem-data" x="235.0" y="351.0" width="30" height="30"/><use href="#gem-quantum" x="271.0" y="351.0" width="30" height="30"/><use href="#gem-quantum" x="55.0" y="387.0" width="30" height="30"/><use href="#gem-data" x="91.0" y="387.0" width="30" height="30"/><use href="#gem-plasma" x="127.0" y="387.0" width="30" height="30"/><use href="#gem-data" x="163.0" y="387.0" width="30" height="30"/><use href="#gem-energy" x="199.0" y="387.0" width="30" height="30"/><use href="#gem-data" x="235.0" y="387.0" width="30" height="30"/><use href="#gem-energy" x="271.0" y="387.0" width="30" height="30"/><use href="#gem-energy" x="55.0" y="423.0" width="30" height="30"/><use href="#gem-energy" x="91.0" y="423.0" width="30" height="30"/><use href="#gem-quantum" x="127.0" y="423.0" width="30" height="30"/><use href="#gem-quantum" x="163.0" y="423.0" width="30" height="30"/><use href="#gem-quantum" x="199.0" y="423.0" width="30" height="30"/><use href="#gem-energy" x="235.0" y="423.0" width="30" height="30"/><use href="#gem-quantum" x="271.0" y="423.0" width="30" height="30"/><use href="#gem-nano" x="55.0" y="459.0" width="30" height="30"/><use href="#gem-quantum" x="91.0" y="459.0" width="30" height="30"/><use href="#gem-data" x="127.0" y="459.0" width="30" height="30"/><use href="#gem-plasma" x="163.0" y="459.0" width="30" height="30"/><use href="#gem-data" x="199.0" y="459.0" width="30" height="30"/><use href="#gem-plasma" x="235.0" y="459.0" width="30" height="30"/><use href="#gem-nano" x="271.0" y="459.0" width="30" height="30"/><use href="#gem-quantum" x="55.0" y="495.0" width="30" height="30"/><use href="#gem-energy" x="91.0" y="495.0" width="30" height="30"/><use href="#gem-energy" x="127.0" y="495.0" width="30" height="30"/><use href="#gem-quantum" x="163.0" y="495.0" width="30" height="30"/><use href="#gem-nano" x="199.0" y="495.0" width="30" height="30"/><use href="#gem-quantum" x="235.0" y="495.0" width="30" height="30"/><use href="#gem-data" x="271.0" y="495.0" width="30" height="30"/><use href="#gem-energy" x="55.0" y="531.0" width="30" height="30"/><use href="#gem-nano" x="91.0" y="531.0" width="30" height="30"/><use href="#gem-nano" x="127.0" y="531.0" width="30" height="30"/><use href="#gem-plasma" x="163.0" y="531.0" width="30" height="30"/><use href="#gem-data" x="199.0" y="531.0" width="30" height="30"/><use href="#gem-nano" x="235.0" y="531.0" width="30" height="30"/><use href="#gem-energy" x="271.0" y="531.0" width="30" height="30"/><use href="#gem-energy" x="55.0" y="567.0" width="30" height="30"/><use href="#gem-data" x="91.0" y="567.0" width="30" height="30"/><use href="#gem-energy" x="127.0" y="567.0" width="30" height="30"/><use href="#gem-quantum" x="163.0" y="567.0" width="30" height="30"/><use href="#gem-energy" x="199.0" y="567.0" width="30" height="30"/><use href="#gem-nano" x="235.0" y="567.0" width="30" height="30"/><use href="#gem-quantum" x="271.0" y="567.0" width="30" height="30"/><rect x="127" y="423" width="102" height="30" rx="8" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+</svg>
+        <div class="themebar" role="group" aria-label="Theme"><button class="tbtn" data-i="0" style="--c:#00C8FF" title="CYBER BLUE">CYBER BLUE</button><button class="tbtn" data-i="1" style="--c:#CC44FF" title="SYNTHWAVE PURPLE">SYNTHWAVE PURPLE</button><button class="tbtn" data-i="2" style="--c:#22FF44" title="BIOPUNK GREEN">BIOPUNK GREEN</button><button class="tbtn" data-i="3" style="--c:#FF3333" title="MEDIEVAL CRIMSON">MEDIEVAL CRIMSON</button><button class="tbtn" data-i="4" style="--c:#939FAF" title="INDUSTRIAL GHOST">INDUSTRIAL GHOST</button><button class="tbtn" data-i="5" style="--c:#FF66AA" title="SAKURA DUSK">SAKURA DUSK</button><button class="tbtn" data-i="6" style="--c:#FFAA22" title="SOLAR FORGE">SOLAR FORGE</button><button class="tbtn" data-i="7" style="--c:#3E6098" title="DAWN LIGHT">DAWN LIGHT</button></div>
+      </div>
+      <div>
+        <h2>How it plays</h2>
+        <ol class="loop">
+          <li><b>1</b><span>Match gems on the board <small>&mdash; each colour mines one of five resources</small></span></li>
+          <li><b>2</b><span>Spend resources to deploy troops <small>&mdash; four ground lanes and the air lane</small></span></li>
+          <li><b>3</b><span>Push the frontline and hold the pylons <small>&mdash; they power you up</small></span></li>
+          <li><b>4</b><span>Trigger a SURGE, then break the enemy core <small>&mdash; before the timer runs out</small></span></li>
+        </ol>
+        <h2>What's in it</h2>
+        <div class="feat">
+          <div><h3>20-level campaign</h3><p>Three acts, a rising curve, a director that adapts to you.</p></div>
+          <div><h3>Nine unit types</h3><p>Ground, air and siege in a rock-paper-scissors triangle.</p></div>
+          <div><h3>Crossover strikes</h3><p>Big board matches fire lasers, orbital hits, EMP and shockwaves into the fight.</p></div>
+          <div><h3>Ghost ladder</h3><p>Every match is recorded and replayed as your opponent. Climb a daily skill-rated board.</p></div>
+          <div><h3>Eight themes</h3><p>The whole game re-skins &mdash; try the buttons under the screen.</p></div>
+          <div><h3>Plays offline</h3><p>The campaign needs no connection. The leaderboard is optional.</p></div>
+        </div>
+        <p class="rule">No ads. No in-app purchases. No third-party tracking.</p>
+      </div>
     </div>
-
-    <h2>What's in it</h2>
-    <div class="feat">
-      <div><h3>20-level campaign</h3><p>Three acts with a rising difficulty curve and a director that adapts to you.</p></div>
-      <div><h3>Nine unit types</h3><p>Ground, air and siege, tied together by a rock-paper-scissors class triangle.</p></div>
-      <div><h3>Crossover strikes</h3><p>Big matches on the board fire lasers, orbital hits, EMP and shockwaves into the battlefield.</p></div>
-      <div><h3>Ghost ladder</h3><p>Every match is recorded as a “ghost” and replayed as your opponent. Climb a daily skill-rated leaderboard against other players' runs.</p></div>
-      <div><h3>Cosmetics only</h3><p>Board skins and trails, unlocked with tokens you earn by playing. No power for sale.</p></div>
-      <div><h3>Plays offline</h3><p>The whole campaign runs with no connection. The online leaderboard is optional.</p></div>
-    </div>
-
-    <p class="rule">No ads. No in-app purchases. No third-party tracking.</p>
 
     <footer>
-      <span>Single-player strategy · Android</span>
+      <span>Single-player strategy &middot; Android</span>
       <span><a href="privacy-notice/">Privacy policy</a></span>
       <span><a href="mailto:infernalzeus69@gmail.com">infernalzeus69@gmail.com</a></span>
     </footer>
-
   </div>
 
+<script>
+  var THEMES = [
+  {"name": "CYBER BLUE", "bgDeep": "#050D1C", "bgPanel": "#0B1828", "bgCard": "#102234", "accent": "#00C8FF", "accent2": "#004466", "troop": "#8CF2FF", "enemy": "#FF6633", "ink": "#D0EEFF", "dim": "#6AAABB"},
+  {"name": "SYNTHWAVE PURPLE", "bgDeep": "#08040E", "bgPanel": "#120A20", "bgCard": "#1C1032", "accent": "#CC44FF", "accent2": "#6614AA", "troop": "#66E5FF", "enemy": "#FF47A0", "ink": "#EEE0FF", "dim": "#9966CC"},
+  {"name": "BIOPUNK GREEN", "bgDeep": "#020804", "bgPanel": "#071208", "bgCard": "#0C1E10", "accent": "#22FF44", "accent2": "#0A5A18", "troop": "#80FF99", "enemy": "#E68019", "ink": "#CCFFDD", "dim": "#44AA55"},
+  {"name": "MEDIEVAL CRIMSON", "bgDeep": "#0E0204", "bgPanel": "#1C0608", "bgCard": "#2C0E0E", "accent": "#FF3333", "accent2": "#AA6600", "troop": "#9EC7F2", "enemy": "#FF6B3D", "ink": "#FFE8E8", "dim": "#CC7766"},
+  {"name": "INDUSTRIAL GHOST", "bgDeep": "#060708", "bgPanel": "#101214", "bgCard": "#1C1F22", "accent": "#939FAF", "accent2": "#384149", "troop": "#CCE0FF", "enemy": "#B36640", "ink": "#EDF0F2", "dim": "#9CA8B1"},
+  {"name": "SAKURA DUSK", "bgDeep": "#0C0410", "bgPanel": "#180A22", "bgCard": "#241030", "accent": "#FF66AA", "accent2": "#88224A", "troop": "#FFBCE0", "enemy": "#CC1F4D", "ink": "#FFE8F2", "dim": "#BB88AA"},
+  {"name": "SOLAR FORGE", "bgDeep": "#0C0800", "bgPanel": "#1A1000", "bgCard": "#281800", "accent": "#FFAA22", "accent2": "#884400", "troop": "#FFE673", "enemy": "#BF4010", "ink": "#FFF2CC", "dim": "#CC8833"},
+  {"name": "DAWN LIGHT", "bgDeep": "#B9BEC8", "bgPanel": "#E4E7EC", "bgCard": "#F5F7FA", "accent": "#3E6098", "accent2": "#AFBCD3", "troop": "#33569E", "enemy": "#C75C3D", "ink": "#161920", "dim": "#414956"}
+];
+  var root = document.documentElement;
+  function applyTheme(i) {
+    var t = THEMES[i]; if (!t) return;
+    root.style.setProperty('--bg-deep', t.bgDeep);
+    root.style.setProperty('--panel',   t.bgPanel);
+    root.style.setProperty('--bf-bg',   t.bgCard);
+    root.style.setProperty('--accent',  t.accent);
+    root.style.setProperty('--accent2', t.accent2);
+    root.style.setProperty('--troop',   t.troop);
+    root.style.setProperty('--enemy',   t.enemy);
+    root.style.setProperty('--ink',     t.ink);
+    root.style.setProperty('--dim',     t.dim);
+    var b = document.querySelectorAll('.tbtn');
+    for (var k=0;k<b.length;k++) b[k].setAttribute('aria-pressed', k==i ? 'true':'false');
+    try { localStorage.setItem('nw_theme', i); } catch(e) {}
+  }
+  document.querySelectorAll('.tbtn').forEach(function(btn){
+    btn.addEventListener('click', function(){ applyTheme(+btn.dataset.i); });
+  });
+  var saved = 0;
+  try { var s = localStorage.getItem('nw_theme'); if (s!==null) saved = +s; } catch(e) {}
+  applyTheme(saved);
+</script>
 </body>
 </html>
