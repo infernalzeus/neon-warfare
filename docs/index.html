@@ -34,15 +34,8 @@
   img { max-width: 100%; display: block; }
   .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
 
-  /* hero over a real in-game backdrop */
-  .hero {
-    position: relative; overflow: hidden;
-    border-bottom: 1px solid var(--line);
-  }
-  .hero .bg {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    object-fit: cover; opacity: .40;
-  }
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .hero .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .40; }
   .hero::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(180deg, #070a1266 0%, #070a12dd 78%, var(--bg) 100%);
@@ -76,11 +69,12 @@
   }
   .loop small { color: var(--dim); }
 
-  .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
-  @media (max-width: 640px) { .themes { grid-template-columns: repeat(2, 1fr); } }
-  .themes figure { margin: 0; }
-  .themes img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
-  .themes figcaption { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-top: .4rem; }
+  .economy { display: flex; gap: 1.4rem; align-items: center;
+             background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 1.4rem; }
+  .economy svg { flex: none; width: 84px; height: 84px; filter: drop-shadow(0 0 14px #ffcf5c44); }
+  .economy p { margin: 0; color: var(--dim); }
+  .economy strong { color: var(--ink); }
+  @media (max-width: 480px) { .economy { flex-direction: column; text-align: center; } }
 
   .feat { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
           border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
@@ -123,12 +117,26 @@
       <li><b>4</b><span>Trigger a SURGE, then destroy the enemy core <small>— before the timer runs out</small></span></li>
     </ol>
 
-    <h2>Eight battlefields, one per theme</h2>
-    <div class="themes">
-      <figure><img src="assets/theme_cyber.jpg"  alt="Cyber battlefield">      <figcaption>Cyber</figcaption></figure>
-      <figure><img src="assets/theme_sakura.jpg" alt="Sakura battlefield">     <figcaption>Sakura</figcaption></figure>
-      <figure><img src="assets/theme_solar.jpg"  alt="Solar Forge battlefield"><figcaption>Solar&nbsp;Forge</figcaption></figure>
-      <figure><img src="assets/theme_ghost.jpg"  alt="Ghost battlefield">      <figcaption>Ghost</figcaption></figure>
+    <h2>The armory runs on tokens</h2>
+    <div class="economy">
+      <!-- the in-game token: three gold shards locked around a blue spark (NeonArt.BuildTokenIcon) -->
+      <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Armory token">
+        <defs>
+          <radialGradient id="spark" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#f2fcff"/>
+            <stop offset=".28" stop-color="#6dccff" stop-opacity=".9"/>
+            <stop offset="1" stop-color="#6dccff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="64" cy="64" r="16" fill="url(#spark)"/>
+        <polygon points="66,64 83.3,56.9 83.3,71.1" fill="#e9c053" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
+        <polygon points="63,65.7 60.5,84.3 48.2,77.2" fill="#fff0bd" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
+        <polygon points="63,62.3 48.2,50.8 60.5,43.7" fill="#ecc65f" stroke="#5c4010" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="64" cy="64" r="3.4" fill="#f2fcff"/>
+      </svg>
+      <p><strong>Tokens</strong> are earned by finishing levels and by converting spare gems.
+        They buy board skins, gem trails and card frames in the armory — and nothing else.
+        There is no real-money currency and nothing to buy with cash.</p>
     </div>
 
     <h2>What's in it</h2>
@@ -137,7 +145,7 @@
       <div><h3>Nine unit types</h3><p>Ground, air and siege, tied together by a rock-paper-scissors class triangle.</p></div>
       <div><h3>Crossover strikes</h3><p>Big matches on the board fire lasers, orbital hits, EMP and shockwaves into the battlefield.</p></div>
       <div><h3>Ghost ladder</h3><p>Every match is recorded as a “ghost” and replayed as your opponent. Climb a daily skill-rated leaderboard against other players' runs.</p></div>
-      <div><h3>Themes &amp; cosmetics</h3><p>Eight colour themes and unlockable board skins — bought only with tokens you earn by playing.</p></div>
+      <div><h3>Cosmetics only</h3><p>Board skins and trails, unlocked with tokens you earn by playing. No power for sale.</p></div>
       <div><h3>Plays offline</h3><p>The whole campaign runs with no connection. The online leaderboard is optional.</p></div>
     </div>
 
