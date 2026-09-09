@@ -997,6 +997,7 @@ namespace NW.App
             var ghost = PendingGhost;
             PendingGhost = null;
             _ghostMode = ghost != null;
+            CrashLog.Note($"StartBattle Lv{level} theme{GameSettings.ThemeIndex} {(ghost != null ? "ghost" : "ai")}");
 
             float dm  = LevelConfig.DirectorMult(level);
             int gems  = LevelConfig.GemColorCount(level);
@@ -1112,6 +1113,7 @@ namespace NW.App
         /// Safe to call once per match; a no-op if there is nothing to record.</summary>
         void FinalizeGhostRecording(bool playerWon)
         {
+            CrashLog.Note($"match end {(playerWon ? "win" : "loss")} tick{(_session != null ? _session.Combat.TickCount : 0)}");
             if (_recorder == null) return;
             var rec = _recorder.Finish(playerWon, _session != null ? _session.Combat.TickCount : 0);
             _recorder = null;

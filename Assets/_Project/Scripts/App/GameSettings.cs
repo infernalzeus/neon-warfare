@@ -107,5 +107,24 @@ namespace NW.App
             get => PlayerPrefs.GetString("gs_peer_ip", "127.0.0.1");
             set { PlayerPrefs.SetString("gs_peer_ip", value); PlayerPrefs.Save(); }
         }
+
+        // ── diagnostics (crash / error reporting) ────────────────────────────
+        // On by default: uncaught exceptions are reported to the Firestore `diagnostics`
+        // collection so failures on real devices are visible. No personal data — a random
+        // per-launch session id only. See CrashLog.cs.
+
+        public static bool DiagnosticsEnabled
+        {
+            get => PlayerPrefs.GetInt("gs_diag", 1) == 1;
+            set { PlayerPrefs.SetInt("gs_diag", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>Also report plain <c>Debug.LogError</c> (not just exceptions). Off by default —
+        /// keeps the noise down.</summary>
+        public static bool DiagnosticsIncludeErrors
+        {
+            get => PlayerPrefs.GetInt("gs_diag_err", 0) == 1;
+            set { PlayerPrefs.SetInt("gs_diag_err", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
     }
 }

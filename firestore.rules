@@ -50,5 +50,20 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.uid == request.auth.uid;
     }
+
+    // Crash / error reports (CrashLog.cs). Write-only for clients; read them in the
+    // Firebase console. No personal data — random per-launch sessionId only.
+    match /diagnostics/{id} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['ts','kind','message','stack','trail','scene','appVersion',
+              'unityVersion','platform','deviceModel','os','sessionId','serverTs'])
+        && request.resource.data.message is string
+        && request.resource.data.message.size() < 2500
+        && request.resource.data.stack is string
+        && request.resource.data.stack.size() < 9000;
+      allow update, delete: if false;
+    }
   }
 }

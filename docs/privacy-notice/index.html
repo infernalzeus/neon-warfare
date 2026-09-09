@@ -33,9 +33,9 @@
   Contact: <a href="mailto:infernalzeus69@gmail.com">infernalzeus69@gmail.com</a>
 </p>
 
-<p>NEON WARFARE is a single-player strategy game. It works fully offline. The <strong>only</strong>
-feature that sends any data off your device is the <strong>online leaderboard</strong>. This policy
-explains what that collects and why.</p>
+<p>NEON WARFARE is a single-player strategy game. It works fully offline. Two features send data off
+your device: the <strong>online leaderboard</strong> and <strong>crash diagnostics</strong>. This
+policy explains what each collects and why.</p>
 
 <h2>What is collected, and why</h2>
 <p>To run the online leaderboard the game stores the following in Google Cloud Firestore:</p>
@@ -70,6 +70,15 @@ explains what that collects and why.</p>
 <p>The game does <strong>not</strong> collect: your real name, email address, phone number, precise
 or coarse location, contacts, photos, files, messages, the device advertising ID, or any analytics
 or usage-tracking data.</p>
+
+<h2>Crash diagnostics</h2>
+<p>If the game hits an unexpected error, it sends a diagnostic report so we can fix it. The report
+contains: the error message and stack trace, which screen you were on, the app and engine version,
+your device model and operating-system version, and a <strong>random identifier generated fresh
+each time you open the game</strong> (it is not stored and cannot be linked to you or to your
+leaderboard entry). It contains no name, email, contacts, location, or file contents. Reports are
+stored in Google Cloud Firestore and used only to diagnose and fix problems. You can turn crash
+reporting off in the game's settings.</p>
 
 <h2>No ads, no analytics, no selling data</h2>
 <p>NEON WARFARE contains no advertising and no third-party analytics or tracking SDKs. Your data is

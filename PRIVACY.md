@@ -4,8 +4,8 @@
 **App:** NEON WARFARE (Android · `com.zeusengine.neonwarfare`)
 **Contact:** infernalzeus69@gmail.com
 
-NEON WARFARE is a single-player strategy game. It works fully offline. The **only** feature that
-sends any data off your device is the **online leaderboard**. This policy explains what that
+NEON WARFARE is a single-player strategy game. It works fully offline. Two features send data off
+your device: the **online leaderboard** and **crash diagnostics**. This policy explains what each
 collects and why.
 
 ## What is collected, and why
@@ -22,6 +22,15 @@ To run the online leaderboard the game stores the following in Google Cloud Fire
 The game does **not** collect: your real name, email address, phone number, precise or coarse
 location, contacts, photos, files, messages, the device advertising ID, or any analytics or
 usage-tracking data.
+
+## Crash diagnostics
+
+If the game hits an unexpected error, it sends a diagnostic report so we can fix it. The report
+contains: the error message and stack trace, which screen you were on, the app and engine version,
+your device model and OS version, and a **random identifier generated fresh each time you open the
+game** (not stored, not linkable to you or your leaderboard entry). No name, email, contacts,
+location, or file contents. Reports go to Google Cloud Firestore and are used only to diagnose and
+fix problems. Crash reporting can be turned off in the game's settings.
 
 ## No ads, no analytics, no selling data
 
