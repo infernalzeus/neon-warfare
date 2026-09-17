@@ -16,7 +16,8 @@ namespace NW.App
         public string pilotId;
         public int    mmr;
         public bool   won;
-        public int    durationTicks;
+        public int    durationTicks;   // raw sim ticks — for the displayed clear time
+        public float  speed;           // BattleSpeed the run was played at (1 = normal)
         public long   recordedUtc;
         public bool   isYou;
         public string ghostId;     // local: GhostStore id · remote: entry doc id
@@ -162,7 +163,8 @@ namespace NW.App
                 list.Add(new LeaderboardEntry
                 {
                     rank = i + 1, pilot = g.pilot, pilotId = g.pilotId, mmr = g.mmr, won = g.PilotWon,
-                    durationTicks = g.durationTicks, recordedUtc = g.recordedUtc,
+                    durationTicks = g.durationTicks, speed = g.speed <= 0f ? 1f : g.speed,
+                    recordedUtc = g.recordedUtc,
                     isYou = !string.IsNullOrEmpty(mePilot) && g.pilot == mePilot,
                     ghostId = g.id, isRemote = false,
                 });
@@ -175,10 +177,14 @@ namespace NW.App
         static int CompareForBoard(GhostRecord a, GhostRecord b)
         {
             if (a.PilotWon != b.PilotWon) return a.PilotWon ? -1 : 1;
-            int c = a.PilotWon ? a.durationTicks.CompareTo(b.durationTicks)
-                               : b.durationTicks.CompareTo(a.durationTicks);
+            int ea = EffTicks(a), eb = EffTicks(b);
+            int c = a.PilotWon ? ea.CompareTo(eb) : eb.CompareTo(ea);
             return c != 0 ? c : a.recordedUtc.CompareTo(b.recordedUtc);
         }
+
+        /// <summary>The tick count the board ranks on: speed-normalised (<c>scoreTicks</c>) when
+        /// present, else the raw <c>durationTicks</c> for legacy / bundled ghosts.</summary>
+        static int EffTicks(GhostRecord g) => g.scoreTicks > 0 ? g.scoreTicks : g.durationTicks;
 
         /// <summary>Does <paramref name="candidate"/> rank ahead of <paramref name="incumbent"/>
         /// on the same board? The rule for overwriting a leaderboard entry.</summary>
@@ -198,8 +204,12 @@ namespace NW.App
             return (won ? BAND : 0L) + (won ? BAND - durationTicks : durationTicks);
         }
         public static long SortKey(GhostRecord g) => g != null && SortKeyValid(g)
-            ? SortKey(g.PilotWon, g.durationTicks) : 0L;
-        static bool SortKeyValid(GhostRecord g) => g.durationTicks >= 0 && g.durationTicks < 1_000_000_000;
+            ? SortKey(g.PilotWon, EffTicks(g)) : 0L;
+        static bool SortKeyValid(GhostRecord g)
+        {
+            int t = EffTicks(g);
+            return t >= 0 && t < 1_000_000_000;
+        }
 
         /// <summary>The player's best rank on today's board for a level, or 0 if they have no entry.</summary>
         public static int YourRank(IEnumerable<GhostRecord> pool, int level, string mePilot, DateTime? nowUtc = null)

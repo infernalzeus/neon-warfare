@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using NW.Combat.Domain;   // CombatSim.DeploySpawnX -- the demo derives its spawn points from the sim
+using NW.Domain;          // Rng -- CombatSim's deterministic RNG, needed to pre-simulate the demo duel
 using UnityEngine.EventSystems;
 using NW.Board.Domain;
-using NW.Net;
 
 namespace NW.App
 {
@@ -97,14 +97,6 @@ namespace NW.App
             "interceptor","hacker","titan","turret"
         };
 
-        // VS / competitive panel
-        GameObject  _vsPanel;
-        Image       _vsBtnBg;
-        Text        _vsBtnTxt;
-        Text        _vsStatusLbl;
-        Text        _mmrLbl;
-        InputField  _ipField;
-        Text        _vsModeLbl;
         readonly List<(Image bg, Text lbl, int level)> _levelBtns = new();
 
         // Everything on this screen was reading translucent and muddy. Three causes:
@@ -776,11 +768,8 @@ namespace NW.App
                 new Color(0.9f, 0.75f, 0.3f), out _);
             shopGo.GetComponent<Button>().onClick.AddListener(OpenCosmeticsScreen);
 
-            // Speed picker — 3 chips below DEPLOY (hidden when VS mode active)
+            // Speed picker — 3 chips below DEPLOY
             BuildSpeedPicker(dx + 55f, (_portrait ? -816f : -356f) + _detailDy + _menuShiftY);
-
-            // VS panel — competitive mode section below speed picker
-            BuildVsPanel(dx + 55f, (_portrait ? -870f : -393f) + _detailDy + _menuShiftY);
 
             // Switch Pilot button — top-right corner of screen, always accessible
             var pilotGo = new GameObject("SwitchPilot"); pilotGo.transform.SetParent(transform, false);
@@ -1121,15 +1110,13 @@ namespace NW.App
             heroAnim.Target   = iconImg;
             heroAnim.ArtId    = heroArt;
             heroAnim.IsPlayer = true;
-
-            // Glowing backdrop behind icon
-            var glowGo = new GameObject("glow"); glowGo.transform.SetParent(iconGo.transform, false);
-            glowGo.transform.SetAsFirstSibling();
-            var glowRt = glowGo.AddComponent<RectTransform>();
-            glowRt.anchorMin = Vector2.zero; glowRt.anchorMax = Vector2.one;
-            glowRt.offsetMin = new Vector2(-12f, -12f); glowRt.offsetMax = new Vector2(12f, 12f);
-            var glowImg = glowGo.AddComponent<Image>();
-            glowImg.color = new Color(t.Accent.r, t.Accent.g, t.Accent.b, 0.18f);
+            // A stationary unit (e.g. turret, Speed == 0) should never fake-walk in preview —
+            // that was the "floating box" that appeared over the icon and then settled.
+            heroAnim.IsStationary = UnitCatalog.Get(troopId)?.Speed <= 0f;
+            // A flying unit (Probe, Talon) shouldn't bounce with a ground walking gait either --
+            // that was the "hopping around like a pigeon" complaint on a unit that's supposed
+            // to hover.
+            heroAnim.IsAir = UnitCatalog.Get(troopId)?.IsAir ?? false;
 
             // ── troop name ──────────────────────────────────────────────────────
             var nameGo = new GameObject("name"); nameGo.transform.SetParent(content, false);
@@ -1413,9 +1400,21 @@ namespace NW.App
             sprRt.offsetMin = sprRt.offsetMax = Vector2.zero;
             if (!isPlayer) sprRt.localScale = new Vector3(-1f, 1f, 1f);   // enemy faces left
             sprRtOut = slotRt;                                            // the LANE mover
+            string demoArtId = ThemeLocale.ArtId(troopId);
             var sprImg = sprGo.AddComponent<RawImage>();
-            sprImg.texture = NeonArt.Unit(ThemeLocale.ArtId(troopId), isPlayer);
-            sprImg.color = Color.white;                                   // livery lives in the art now
+            sprImg.texture = NeonArt.Unit(demoArtId, isPlayer);
+            // "Livery lives in the art now" holds for themes whose signature colour is part of
+            // the authored sprite (a cape, heraldry). Cyber's glow accents are fixed theme
+            // constants, not per-team livery, so an enemy Cyber unit baked no differently than
+            // Color.white here read as the same cyan as the player's -- not a distinct shade at
+            // all. Mirrors BattlefieldView.StyleView's own team tint so the demo matches the
+            // real battlefield instead of introducing a second, different rule.
+            Color teamColor = isPlayer ? NeonCosmetics.GetTroopTint() : NeonTheme.Active.EnemyTint;
+            Color bodyTint = teamColor;
+            if (!isPlayer) bodyTint *= new Color(1.0f, 0.82f, 0.92f, 1f);
+            bodyTint.a = 1f;
+            if (NeonArt.IsAuthoredArt(demoArtId)) bodyTint = Color.Lerp(Color.white, bodyTint, 0.22f);
+            sprImg.color = bodyTint;
             sprImg.raycastTarget = false;
 
             // HP bar above the unit, battlefield style
@@ -1563,158 +1562,329 @@ namespace NW.App
             => UnitCatalog.Get(canonicalId)?.TargetsAir
                ?? (canonicalId == "interceptor" || canonicalId == "turret");
 
+        /// <summary>One recorded 0.05s step of a pre-simulated duel — lets the coroutine play
+        /// back the real CombatSim result at a watchable pace instead of re-deriving combat.</summary>
+        readonly struct DuelTick
+        {
+            public readonly float LX, RX, LHp, RHp;
+            public readonly bool LHitR, RHitL, LDied, RDied;
+            public DuelTick(float lx, float rx, float lhp, float rhp, bool lHitR, bool rHitL, bool lDied, bool rDied)
+            {
+                LX = lx; RX = rx; LHp = lhp; RHp = rhp;
+                LHitR = lHitR; RHitL = rHitL; LDied = lDied; RDied = rDied;
+            }
+        }
+
+        /// <summary>SpawnAtPylon (turret, hacker) gates player-side deployment on owning a
+        /// forward pylon — correct for a real battle, meaningless for an isolated 1v1 preview
+        /// with no captured pylons, where it would just make CombatSim.Spawn refuse the unit.</summary>
+        static UnitSpec DemoSpawnable(UnitSpec src)
+        {
+            if (!src.SpawnAtPylon) return src;
+            return new UnitSpec
+            {
+                Id = src.Id, Class = src.Class, MaxHp = src.MaxHp, Damage = src.Damage,
+                AttackCooldown = src.AttackCooldown, Speed = src.Speed, Range = src.Range,
+                AoeRadius = src.AoeRadius, IsAir = src.IsAir, TargetsAir = src.TargetsAir,
+                TargetsGround = src.TargetsGround, CanCapture = src.CanCapture,
+                SpawnAtPylon = false, DirectorCost = src.DirectorCost,
+            };
+        }
+
         /// <summary>
         /// The demo lane now honours HOW a unit fights, not just that it fights. A melee troop
         /// closes to contact; a ranged troop holds its stand-off and looses a projectile; an air
         /// troop hovers above the lane and strikes down at an angle instead of brawling on the
         /// floor. Showing a Rogue toe-to-toe with a Knight misrepresented the whole unit.
+        ///
+        /// The fight itself now RUNS the real CombatSim rather than approximating it: cooldowns,
+        /// range-based targeting, class-triangle bonus and AoE all fall out for free instead of
+        /// being separately hand-scripted here. CombatSim is pure C# with no Unity dependency, so
+        /// the whole duel is pre-simulated instantly, then played back at a pace that compresses a
+        /// lopsided matchup into a watchable window without ever touching the real numbers.
         /// </summary>
         IEnumerator TroopDemoLoop(
             string leftId,  Graphic leftFlash,  Image leftHpFill,  float leftMaxHp,  RectTransform leftSpr,
             string rightId, Graphic rightFlash, Image rightHpFill, float rightMaxHp, RectTransform rightSpr)
         {
-            TroopStats.TryGet(leftId, out var leftInfo);
-            TroopStats.TryGet(rightId, out var rightInfo);
             string lArt = ThemeLocale.ArtId(leftId), rArt = ThemeLocale.ArtId(rightId);
-
-            float leftCd  = Mathf.Max(0.65f, leftInfo.AttackCooldown);
-            float rightCd = Mathf.Max(0.65f, rightInfo.AttackCooldown);
-            // Was rightMaxHp/6 and leftMaxHp/6 -- every duel took exactly six hits no matter
-            // what the units actually hit for, so a titan and a drone looked equally deadly.
-            // Real damage now, from the same catalogue the battle runs on.
             var lSpec = UnitCatalog.Get(leftId);
             var rSpec = UnitCatalog.Get(rightId);
-            float leftDmg  = lSpec != null ? lSpec.Damage : Mathf.Max(6f, rightMaxHp / 6f);
-            float rightDmg = rSpec != null ? rSpec.Damage : Mathf.Max(6f, leftMaxHp  / 6f);
+            if (lSpec == null || rSpec == null) yield break;
+            // Rigged units (currently the 4 Cyber humanoids) get the same continuous hip/knee
+            // bend here that BattlefieldView drives, instead of the two-frame walk swap below.
+            // lArt/rArt are fixed for the coroutine's whole life, so these build once.
+            RawImage leftSprImg = null, rightSprImg = null;
+            var leftSprT = leftSpr != null ? leftSpr.Find("spr") : null;
+            var rightSprT = rightSpr != null ? rightSpr.Find("spr") : null;
+            RawImage[] leftLimbs = (leftSprT != null && NeonArt.HasLimbRig(lArt))
+                ? LimbRigView.Build((RectTransform)leftSprT, lArt, true) : null;
+            RawImage[] rightLimbs = (rightSprT != null && NeonArt.HasLimbRig(rArt))
+                ? LimbRigView.Build((RectTransform)rightSprT, rArt, false) : null;
+            if (leftSprT != null) leftSprImg = leftSprT.GetComponent<RawImage>();
+            if (rightSprT != null) rightSprImg = rightSprT.GetComponent<RawImage>();
+            var leftFlashT = leftSprT != null ? leftSprT.Find("flash") : null;
+            var rightFlashT = rightSprT != null ? rightSprT.Find("flash") : null;
+            RawImage leftFlashImg = leftFlashT != null ? leftFlashT.GetComponent<RawImage>() : null;
+            RawImage rightFlashImg = rightFlashT != null ? rightFlashT.GetComponent<RawImage>() : null;
+            // Rotor-rigged units (Probe) get the same continuous spin here as the battlefield,
+            // instead of the old fast pose-1/2 blade flip further down. This was the one place
+            // that never got the rotor rig at all, so Probe here was still on the old swap.
+            RawImage[] leftRotors = (leftSprT != null && NeonArt.HasRotorRig(lArt))
+                ? LimbRigView.BuildRotors((RectTransform)leftSprT, lArt, true) : null;
+            RawImage[] rightRotors = (rightSprT != null && NeonArt.HasRotorRig(rArt))
+                ? LimbRigView.BuildRotors((RectTransform)rightSprT, rArt, false) : null;
+            float rotorSpinL = 0f, rotorSpinR = 0f;
+            bool leftRotorsOn = false, rightRotorsOn = false;
 
-            // A drone needs a hundred hits to fell a titan. That is TRUE and worth showing --
-            // the bar barely moves -- but at real cadence the loop would run for two minutes.
-            // So the PACING compresses on a lopsided duel and the damage never does: each hit
-            // still removes the real fraction of the bar, which is the part that has to be
-            // honest. A fast, weak attacker now reads as fast and weak.
-            float lHits = leftDmg  > 0f ? rightMaxHp / leftDmg  : 99f;
-            float rHits = rightDmg > 0f ? leftMaxHp  / rightDmg : 99f;
-            float demoPace = Mathf.Clamp(10f / Mathf.Max(4f, Mathf.Max(lHits, rHits)), 0.16f, 1f);
-            leftCd  = Mathf.Max(0.10f, leftCd  * demoPace);
-            rightCd = Mathf.Max(0.10f, rightCd * demoPace);
+            bool lAir = lSpec.IsAir, rAir = rSpec.IsAir;
+            bool lRanged = lSpec.Range > 4f || lAir;
+            bool rRanged = rSpec.Range > 4f || rAir;
             var hitOnLeft  = NeonTheme.Active.AccentSecondary;
             var hitOnRight = NeonTheme.Active.Accent;
 
-            bool lAir = DemoIsAir(leftId), rAir = DemoIsAir(rightId);
-            // The demo was letting a Knight trade blows with a Rogue. In the real game a
-            // ground unit has TargetsAir = false, so it can never land a hit on the air lane --
-            // the Rogue attacks for as long as it likes and takes nothing back. Showing an even
-            // melee misrepresented the unit completely.
-            bool lCanHit = !rAir || DemoTargetsAir(leftId);
-            bool rCanHit = !lAir || DemoTargetsAir(rightId);
-            bool lRanged = leftInfo.Range  > 4f || lAir;
-            bool rRanged = rightInfo.Range > 4f || rAir;
-
-            // Were 0.10 / 0.90 by eye. Derived from the sim now, so the demo starts its
-            // troops on the deploy pads rather than near them.
-            float SPAWN_L = 0.045f + (CombatSim.DeploySpawnX / CombatSim.LaneLength) * 0.91f;
-            float SPAWN_R = 0.955f - (CombatSim.DeploySpawnX / CombatSim.LaneLength) * 0.91f;
-            const float GROUND  = 0.17f, AIRLINE = 0.52f;
-            // MARCH was a single constant shared by both sides, so a titan (Speed 1.5) and an
-            // interceptor (Speed 6) crossed the lane in exactly the same time. Each side now
-            // gets its own march duration from its real Speed, normalised around the trooper
-            // (Speed 4) so the demo keeps a watchable pace -- a fast unit arrives first, which
-            // is the whole point of the stat.
-            float SpeedOf(string cid) => UnitCatalog.Get(cid)?.Speed ?? 4f;
-            float MarchTime(string cid) =>
-                Mathf.Clamp(1.6f * (4f / Mathf.Max(0.8f, SpeedOf(cid))), 0.75f, 3.0f);
-            float marchL = MarchTime(leftId), marchR = MarchTime(rightId);
-            float MARCH = Mathf.Max(marchL, marchR);
-
+            const float GROUND = 0.17f, AIRLINE = 0.52f;
             float lGround = lAir ? AIRLINE : GROUND;
             float rGround = rAir ? AIRLINE : GROUND;
-            // Ranged units hold a stand-off scaled to their reach; melee closes to contact.
-            float lStop = lRanged ? Mathf.Lerp(0.40f, 0.24f, Mathf.Clamp01(leftInfo.Range  / 25f)) : 0.415f;
-            float rStop = rRanged ? Mathf.Lerp(0.60f, 0.76f, Mathf.Clamp01(rightInfo.Range / 25f)) : 0.585f;
+
+            // CombatSim.X already encodes each side's real marching direction (player 0->100,
+            // enemy 100->0), so one screen-fraction mapping covers both combatants.
+            float Nx(float x) => 0.045f + Mathf.Clamp01(x / CombatSim.LaneLength) * 0.91f;
+
+            // A melee unit's real attack Range (2-4 out of a 100-unit lane) maps to only a few
+            // PIXELS of screen separation -- far smaller than the ~118px sprite itself, so the
+            // two combatants visually collapsed into one indistinct blob at contact. This is a
+            // display-only correction (never touches the sim's real X, which the HP/hit-timing
+            // logic still reads) that nudges both sprites symmetrically apart so they stay
+            // visually distinct while still reading as "close, melee-range" rather than the old
+            // hardcoded stand-off distance.
+            const float MinMeleeGapNx = 0.10f;
+            (float l, float r) VisualNx(float lx, float rx)
+            {
+                float nl = Nx(lx), nr = Nx(rx);
+                float gap = nr - nl;
+                if (gap < MinMeleeGapNx)
+                {
+                    float mid = (nl + nr) * 0.5f;
+                    nl = mid - MinMeleeGapNx * 0.5f;
+                    nr = mid + MinMeleeGapNx * 0.5f;
+                }
+                return (nl, nr);
+            }
 
             while (leftFlash != null && rightFlash != null && leftSpr != null && rightSpr != null)
             {
-                float leftHp = leftMaxHp, rightHp = rightMaxHp;
                 if (leftHpFill  != null) leftHpFill.rectTransform.anchorMax  = Vector2.one;
                 if (rightHpFill != null) rightHpFill.rectTransform.anchorMax = Vector2.one;
                 leftSpr.localRotation = Quaternion.identity;
                 rightSpr.localRotation = Quaternion.identity;
                 leftFlash.color = Color.clear; rightFlash.color = Color.clear;
 
-                // advance into position — walkers step, fliers bob
-                for (float tm = 0f; tm < MARCH; tm += Time.deltaTime)
+                // ---- Pre-simulate the whole duel with the real sim, instantly. A 1v1 fixed-
+                // lane duel with an empty director table has no randomness that matters, so a
+                // fixed seed is fine — this is a preview, not a ranked match. ----
+                var sim = new CombatSim(1_000_000f, 1_000_000f, new DirectorConfig(), new Rng(1));
+                int li = sim.Spawn(DemoSpawnable(lSpec), Team.Player, lane: 0);
+                int ri = sim.Spawn(DemoSpawnable(rSpec), Team.Enemy,  lane: 0);
+
+                var frames = new List<DuelTick>(512);
+                if (li >= 0 && ri >= 0)
                 {
-                    if (leftSpr == null || rightSpr == null) yield break;
-                    float prL = Mathf.Clamp01(tm / marchL);
-                    float prR = Mathf.Clamp01(tm / marchR);
-                    float gait = tm * 8f;
-                    float bobL = lAir ? Mathf.Sin(gait * 0.6f) * 4f : Mathf.Abs(Mathf.Sin(gait)) * 3f;
-                    float bobR = rAir ? Mathf.Sin(gait * 0.6f + 1f) * 4f : Mathf.Abs(Mathf.Sin(gait + Mathf.PI)) * 3f;
-                    DemoPlace(leftSpr,  Mathf.Lerp(SPAWN_L, lStop, prL), lGround, bobL);
-                    DemoPlace(rightSpr, Mathf.Lerp(SPAWN_R, rStop, prR), rGround, bobR);
-                    int f = Mathf.Sin(gait) > 0f ? 1 : 2;
-                    DemoPose(leftSpr,  lArt, f, true);
-                    DemoPose(rightSpr, rArt, f == 1 ? 2 : 1, false);
-                    yield return null;
-                }
-                DemoPlace(leftSpr, lStop, lGround, 0f); DemoPlace(rightSpr, rStop, rGround, 0f);
-                DemoPose(leftSpr, lArt, 0, true); DemoPose(rightSpr, rArt, 0, false);
-
-                float lT = leftCd * 0.35f, rT = rightCd * 0.8f, hover = 0f;
-                float stale = 0f;
-                while (leftHp > 0f && rightHp > 0f)
-                {
-                    if (!lCanHit && !rCanHit && (stale += Time.deltaTime) > 4f) break;
-                    if (leftSpr == null || rightSpr == null) yield break;
-                    float dt = Time.deltaTime; hover += dt;
-                    if (lCanHit) lT -= dt;   // no windup animation against a target it cannot reach
-                    if (rCanHit) rT -= dt;
-
-                    // fliers never stand still
-                    if (lAir) DemoPlace(leftSpr,  lStop, lGround, Mathf.Sin(hover * 3.2f) * 4f);
-                    if (rAir) DemoPlace(rightSpr, rStop, rGround, Mathf.Sin(hover * 3.2f + 1.4f) * 4f);
-
-                    if (lT <= 0f && lCanHit)
+                    const int MAX_TICKS = 2400; // 120s of sim time — covers even a mutual-standoff (e.g. turret vs turret out of range)
+                    for (int i = 0; i < MAX_TICKS; i++)
                     {
-                        lT = leftCd;
-                        rightHp = Mathf.Max(0f, rightHp - leftDmg);
-                        if (rightHpFill != null)
-                            rightHpFill.rectTransform.anchorMax = new Vector2(rightHp / rightMaxHp, 1f);
-                        if (rightFlash != null) StartCoroutine(DemoFlash(rightFlash, hitOnRight));
-                        if (lRanged)
+                        sim.Tick();
+                        UnitState lu = sim.Units[li], ru = sim.Units[ri];
+                        bool lHitR = false, rHitL = false, lDied = false, rDied = false;
+                        foreach (var ev in sim.Events)
                         {
-                            StartCoroutine(DemoLoose(lArt, leftSpr, lStop, lGround, true));
-                            StartCoroutine(DemoBolt(lStop, lGround, rStop, rGround, true));
+                            if (ev.Type == CombatEventType.Hit)
+                            {
+                                if (ev.Unit == li && ev.Target == ri) lHitR = true;
+                                else if (ev.Unit == ri && ev.Target == li) rHitL = true;
+                            }
+                            else if (ev.Type == CombatEventType.Died)
+                            {
+                                if (ev.Unit == li) lDied = true;
+                                else if (ev.Unit == ri) rDied = true;
+                            }
                         }
-                        else StartCoroutine(DemoStrike(lArt, leftSpr, lStop, +1f, true, lGround));
-                        StartCoroutine(DemoFlinch(rArt, rightSpr, rStop, +1f, false, rGround));
+                        sim.Events.Clear();
+                        frames.Add(new DuelTick(lu.X, ru.X, lu.Hp, ru.Hp, lHitR, rHitL, lDied, rDied));
+                        if (lDied || rDied) break;
                     }
-                    if (rT <= 0f && rCanHit)
-                    {
-                        rT = rightCd;
-                        leftHp = Mathf.Max(0f, leftHp - rightDmg);
-                        if (leftHpFill != null)
-                            leftHpFill.rectTransform.anchorMax = new Vector2(leftHp / leftMaxHp, 1f);
-                        if (leftFlash != null) StartCoroutine(DemoFlash(leftFlash, hitOnLeft));
-                        if (rRanged)
-                        {
-                            StartCoroutine(DemoLoose(rArt, rightSpr, rStop, rGround, false));
-                            StartCoroutine(DemoBolt(rStop, rGround, lStop, lGround, false));
-                        }
-                        else StartCoroutine(DemoStrike(rArt, rightSpr, rStop, -1f, false, rGround));
-                        StartCoroutine(DemoFlinch(lArt, leftSpr, lStop, -1f, true, lGround));
-                    }
-                    yield return null;
                 }
 
-                var dead = leftHp <= 0f ? leftSpr : rightSpr;
-                float tilt = leftHp <= 0f ? -72f : 72f;
-                for (float tm = 0f; tm < 0.5f; tm += Time.deltaTime)
+                if (frames.Count == 0) { yield return new WaitForSeconds(0.55f); continue; }
+
+                // A drone needs a hundred hits to fell a titan. That is TRUE and worth showing,
+                // but at real cadence the loop could run for two minutes. So the VIEWING speed
+                // compresses on a long duel and the recorded numbers never do — a fast, weak
+                // attacker still reads as fast and weak, just replayed quicker.
+                float simSeconds  = frames.Count * CombatSim.TickDelta;
+                float playSeconds = Mathf.Clamp(simSeconds, 1.2f, 6f);
+                float speed       = simSeconds / Mathf.Max(playSeconds, 0.01f);
+
+                float playhead = 0f;
+                int shownTick = -1;
+                bool wasWalkingL = true, wasWalkingR = true; // both start marching from spawn
+                float gaitL = 0f, gaitR = 0f, hoverL = 0f, hoverR = 0f;
+                bool ended = false;
+
+                while (!ended)
                 {
-                    if (dead == null) break;
-                    float pr = Mathf.Clamp01(tm / 0.5f);
-                    dead.localRotation = Quaternion.Euler(0f, 0f, tilt * pr * pr);
+                    if (leftSpr == null || rightSpr == null) yield break;
+                    playhead += (Time.deltaTime * speed) / CombatSim.TickDelta;
+                    int curTick = Mathf.Clamp((int)playhead, 0, frames.Count - 1);
+
+                    for (int k = shownTick + 1; k <= curTick; k++)
+                    {
+                        DuelTick fr = frames[k];
+                        var (frNxL, frNxR) = VisualNx(fr.LX, fr.RX);
+                        if (fr.LHitR)
+                        {
+                            if (rightFlash != null) StartCoroutine(DemoFlash(rightFlash, hitOnRight));
+                            if (lRanged)
+                            {
+                                StartCoroutine(DemoLoose(lArt, leftSpr, frNxL, lGround, true));
+                                StartCoroutine(DemoBolt(frNxL, lGround, frNxR, rGround, true));
+                            }
+                            else StartCoroutine(DemoStrike(lArt, leftSpr, frNxL, +1f, true, lGround));
+                            StartCoroutine(DemoFlinch(rArt, rightSpr, frNxR, +1f, false, rGround));
+                        }
+                        if (fr.RHitL)
+                        {
+                            if (leftFlash != null) StartCoroutine(DemoFlash(leftFlash, hitOnLeft));
+                            if (rRanged)
+                            {
+                                StartCoroutine(DemoLoose(rArt, rightSpr, frNxR, rGround, false));
+                                StartCoroutine(DemoBolt(frNxR, rGround, frNxL, lGround, false));
+                            }
+                            else StartCoroutine(DemoStrike(rArt, rightSpr, frNxR, -1f, false, rGround));
+                            StartCoroutine(DemoFlinch(lArt, leftSpr, frNxL, -1f, true, lGround));
+                        }
+                        if (fr.LDied || fr.RDied) ended = true;
+                    }
+                    shownTick = curTick;
+
+                    DuelTick frame = frames[curTick];
+                    var (nxL, nxR) = VisualNx(frame.LX, frame.RX);
+                    float dt = Time.deltaTime;
+                    int nextTick = Mathf.Min(curTick + 1, frames.Count - 1);
+                    bool walkingL = curTick < frames.Count - 1 && Mathf.Abs(frames[nextTick].LX - frame.LX) > 0.001f;
+                    bool walkingR = curTick < frames.Count - 1 && Mathf.Abs(frames[nextTick].RX - frame.RX) > 0.001f;
+
+                    // Rotors (Probe) spin continuously regardless of walking, same as the
+                    // battlefield -- driven here, once, so neither walking branch below needs
+                    // to think about it. Body texture is set to the no-blades version once and
+                    // never touched again by DemoPose, which is what was still baking the old
+                    // blade-flip in.
+                    if (leftRotors != null)
+                    {
+                        rotorSpinL += dt * 900f;
+                        if (!leftRotorsOn)
+                        {
+                            leftRotorsOn = true;
+                            LimbRigView.SetEnabled(leftRotors, true, leftSprImg != null ? leftSprImg.color : Color.white);
+                            var noRotorTex = NeonArt.UnitNoRotor(lArt, true);
+                            if (leftSprImg != null) leftSprImg.texture = noRotorTex;
+                            if (leftFlashImg != null) leftFlashImg.texture = noRotorTex;
+                        }
+                        LimbRigView.SpinRotors(leftRotors, rotorSpinL);
+                    }
+                    if (rightRotors != null)
+                    {
+                        rotorSpinR += dt * 900f;
+                        if (!rightRotorsOn)
+                        {
+                            rightRotorsOn = true;
+                            LimbRigView.SetEnabled(rightRotors, true, rightSprImg != null ? rightSprImg.color : Color.white);
+                            var noRotorTex = NeonArt.UnitNoRotor(rArt, false);
+                            if (rightSprImg != null) rightSprImg.texture = noRotorTex;
+                            if (rightFlashImg != null) rightFlashImg.texture = noRotorTex;
+                        }
+                        LimbRigView.SpinRotors(rightRotors, rotorSpinR);
+                    }
+
+                    if (walkingL)
+                    {
+                        gaitL += dt * 8f;
+                        float bobL = lAir ? Mathf.Sin(gaitL * 0.6f) * 4f : Mathf.Abs(Mathf.Sin(gaitL)) * 3f;
+                        DemoPlace(leftSpr, nxL, lGround, bobL);
+                        if (leftLimbs != null)
+                        {
+                            LimbRigView.SetEnabled(leftLimbs, true, leftSprImg != null ? leftSprImg.color : Color.white);
+                            var noLimbsTex = NeonArt.UnitNoLimbs(lArt, true);
+                            if (leftSprImg != null) leftSprImg.texture = noLimbsTex;
+                            if (leftFlashImg != null) leftFlashImg.texture = noLimbsTex;
+                            LimbRigView.Drive(leftLimbs, gaitL, true, lArt);
+                        }
+                        else if (leftRotors == null)
+                            DemoPose(leftSpr, lArt, lArt == "cybmech" ? 0 : (Mathf.Sin(gaitL) > 0f ? 1 : 2), true);
+                    }
+                    else
+                    {
+                        if (leftLimbs != null) LimbRigView.SetEnabled(leftLimbs, false, Color.white);
+                        if (wasWalkingL && leftRotors == null) DemoPose(leftSpr, lArt, 0, true); // settle once, hand off to hit anims
+                        float lift = 0f;
+                        if (lAir) { hoverL += dt; lift = Mathf.Sin(hoverL * 3.2f) * 4f; } // fliers never stand still
+                        DemoPlace(leftSpr, nxL, lGround, lift);
+                    }
+                    wasWalkingL = walkingL;
+
+                    if (walkingR)
+                    {
+                        gaitR += dt * 8f;
+                        float bobR = rAir ? Mathf.Sin(gaitR * 0.6f + 1f) * 4f : Mathf.Abs(Mathf.Sin(gaitR + Mathf.PI)) * 3f;
+                        DemoPlace(rightSpr, nxR, rGround, bobR);
+                        if (rightLimbs != null)
+                        {
+                            LimbRigView.SetEnabled(rightLimbs, true, rightSprImg != null ? rightSprImg.color : Color.white);
+                            var noLimbsTex = NeonArt.UnitNoLimbs(rArt, false);
+                            if (rightSprImg != null) rightSprImg.texture = noLimbsTex;
+                            if (rightFlashImg != null) rightFlashImg.texture = noLimbsTex;
+                            // rightSpr's "spr" child already carries localScale.x=-1 (see
+                            // MakeDemoSlot) -- Unity mirrors every child rotation through that
+                            // automatically. Drive's own isPlayer-false sign flip was ALSO firing
+                            // on top of it, cancelling back out to the player's un-mirrored gait
+                            // handedness while the body stayed visually flipped: legs stepping
+                            // one way, body facing the other -- the "moonwalking" enemy. Pass
+                            // true here (not rArt's real team) so Drive contributes no flip of
+                            // its own; the geometric mirror is the only one that should apply.
+                            LimbRigView.Drive(rightLimbs, gaitR, true, rArt);
+                        }
+                        else if (rightRotors == null)
+                            DemoPose(rightSpr, rArt, rArt == "cybmech" ? 0 : (Mathf.Sin(gaitR) > 0f ? 2 : 1), false);
+                    }
+                    else
+                    {
+                        if (rightLimbs != null) LimbRigView.SetEnabled(rightLimbs, false, Color.white);
+                        if (wasWalkingR && rightRotors == null) DemoPose(rightSpr, rArt, 0, false);
+                        float lift = 0f;
+                        if (rAir) { hoverR += dt; lift = Mathf.Sin(hoverR * 3.2f + 1.4f) * 4f; }
+                        DemoPlace(rightSpr, nxR, rGround, lift);
+                    }
+                    wasWalkingR = walkingR;
+
+                    if (leftHpFill  != null) leftHpFill.rectTransform.anchorMax  = new Vector2(Mathf.Clamp01(frame.LHp / lSpec.MaxHp), 1f);
+                    if (rightHpFill != null) rightHpFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(frame.RHp / rSpec.MaxHp), 1f);
+
+                    if (curTick >= frames.Count - 1 && !ended) break; // mutual standoff — ran out the clock
                     yield return null;
+                }
+
+                if (ended)
+                {
+                    DuelTick lastFrame = frames[shownTick];
+                    var dead = lastFrame.LDied ? leftSpr : rightSpr;
+                    float tilt = lastFrame.LDied ? -72f : 72f;
+                    for (float tm = 0f; tm < 0.5f; tm += Time.deltaTime)
+                    {
+                        if (dead == null) break;
+                        float pr = Mathf.Clamp01(tm / 0.5f);
+                        dead.localRotation = Quaternion.Euler(0f, 0f, tilt * pr * pr);
+                        yield return null;
+                    }
                 }
                 yield return new WaitForSeconds(0.55f);
             }
@@ -2110,298 +2280,6 @@ namespace NW.App
             }
         }
 
-        // ─────────────────────────── VS / competitive panel ──────────────────────
-
-        void BuildVsPanel(float cx, float y)
-        {
-            var t = NeonTheme.Active;
-
-            // [VS] toggle chip — sits at the right of the footer area
-            var vsToggleGo = new GameObject("VSToggle"); vsToggleGo.transform.SetParent(transform, false);
-            var vsTRt = vsToggleGo.AddComponent<RectTransform>();
-            vsTRt.anchorMin = vsTRt.anchorMax = new Vector2(0.5f, 0.5f);
-            vsTRt.pivot     = new Vector2(0.5f, 0.5f);
-            vsTRt.anchoredPosition = new Vector2(cx + 145f, y + 12f);
-            vsTRt.sizeDelta = new Vector2(72f, 26f);
-            _vsBtnBg  = vsToggleGo.AddComponent<Image>();
-            var vsBrd = new GameObject("brd"); vsBrd.transform.SetParent(vsToggleGo.transform, false);
-            vsBrd.transform.SetAsFirstSibling();
-            var vsBrdRt = vsBrd.AddComponent<RectTransform>();
-            vsBrdRt.anchorMin = Vector2.zero; vsBrdRt.anchorMax = Vector2.one;
-            vsBrdRt.offsetMin = new Vector2(-1, -1); vsBrdRt.offsetMax = new Vector2(1, 1);
-            vsBrd.AddComponent<Image>().color = new Color(t.Accent.r, t.Accent.g, t.Accent.b, 0.6f);
-            var vsTxtGo = new GameObject("txt"); vsTxtGo.transform.SetParent(vsToggleGo.transform, false);
-            var vsTxtRt = vsTxtGo.AddComponent<RectTransform>();
-            vsTxtRt.anchorMin = Vector2.zero; vsTxtRt.anchorMax = Vector2.one;
-            vsTxtRt.offsetMin = vsTxtRt.offsetMax = Vector2.zero;
-            _vsBtnTxt = vsTxtGo.AddComponent<Text>();
-            _vsBtnTxt.font = _font; _vsBtnTxt.fontSize = UIScale.FontSmall; _vsBtnTxt.fontStyle = FontStyle.Bold;
-            _vsBtnTxt.alignment = TextAnchor.MiddleCenter; _vsBtnTxt.supportRichText = false; _vsBtnTxt.raycastTarget = false;
-            var vsBtn = vsToggleGo.AddComponent<Button>(); vsBtn.transition = Selectable.Transition.None;
-            vsBtn.onClick.AddListener(ToggleVsMode);
-            vsToggleGo.AddComponent<ButtonFeel>();
-
-            // Expandable VS detail panel
-            _vsPanel = new GameObject("VSPanel"); _vsPanel.transform.SetParent(transform, false);
-            // Was a 340x82 box pinned into the footer, which ran off the top of the screen the
-            // moment it opened. It is a centred modal now -- same shape as the settings card and
-            // the theme picker, so all three overlays behave identically.
-            var vpRt = _vsPanel.AddComponent<RectTransform>();
-            vpRt.anchorMin = Vector2.zero; vpRt.anchorMax = Vector2.one;
-            vpRt.offsetMin = vpRt.offsetMax = Vector2.zero;
-            var vpScrim = _vsPanel.AddComponent<Image>();
-            vpScrim.color = new Color(t.BgDeep.r * 0.4f, t.BgDeep.g * 0.4f, t.BgDeep.b * 0.4f, 0.92f);
-            var vpScrimBtn = _vsPanel.AddComponent<Button>();
-            vpScrimBtn.transition = Selectable.Transition.None;
-            vpScrimBtn.onClick.AddListener(() => _vsPanel.SetActive(false));
-
-            var vsBrdGo = new GameObject("cardbrd"); vsBrdGo.transform.SetParent(_vsPanel.transform, false);
-            var vsBrdRt2 = vsBrdGo.AddComponent<RectTransform>();
-            vsBrdRt2.anchorMin = vsBrdRt2.anchorMax = new Vector2(0.5f, 0.5f);
-            vsBrdRt2.pivot = new Vector2(0.5f, 0.5f);
-            vsBrdRt2.anchoredPosition = Vector2.zero;
-            vsBrdRt2.sizeDelta = (_portrait ? new Vector2(720f, 420f) : new Vector2(480f, 260f))
-                                 + new Vector2(8f, 8f);
-            vsBrdGo.AddComponent<Image>().color = t.Accent;
-
-            var vsCard = new GameObject("card"); vsCard.transform.SetParent(_vsPanel.transform, false);
-            var vsCardRt = vsCard.AddComponent<RectTransform>();
-            vsCardRt.anchorMin = vsCardRt.anchorMax = new Vector2(0.5f, 0.5f);
-            vsCardRt.pivot = new Vector2(0.5f, 0.5f);
-            vsCardRt.anchoredPosition = Vector2.zero;
-            vsCardRt.sizeDelta = _portrait ? new Vector2(720f, 420f) : new Vector2(480f, 260f);
-            vsCard.AddComponent<Image>().color = Lift(t.BgCard, 0.16f);
-            vsCard.AddComponent<Button>().transition = Selectable.Transition.None; // eat taps
-
-            var vsTitleGo = new GameObject("title"); vsTitleGo.transform.SetParent(vsCard.transform, false);
-            var vsTitleRt = vsTitleGo.AddComponent<RectTransform>();
-            vsTitleRt.anchorMin = new Vector2(0f, 1f); vsTitleRt.anchorMax = new Vector2(1f, 1f);
-            vsTitleRt.pivot = new Vector2(0.5f, 1f);
-            vsTitleRt.anchoredPosition = new Vector2(0f, -14f);
-            vsTitleRt.sizeDelta = new Vector2(-40f, 52f);
-            var vsTitle = vsTitleGo.AddComponent<Text>();
-            vsTitle.font = _font; vsTitle.fontSize = _portrait ? 40 : 22;
-            vsTitle.color = Color.white; vsTitle.alignment = TextAnchor.MiddleLeft;
-            vsTitle.text = "VERSUS"; vsTitle.supportRichText = false; vsTitle.raycastTarget = false;
-
-            var vsClose = new GameObject("close"); vsClose.transform.SetParent(vsCard.transform, false);
-            var vsCloseRt = vsClose.AddComponent<RectTransform>();
-            vsCloseRt.anchorMin = vsCloseRt.anchorMax = new Vector2(1f, 1f);
-            vsCloseRt.pivot = new Vector2(1f, 1f);
-            vsCloseRt.anchoredPosition = new Vector2(-12f, -12f);
-            vsCloseRt.sizeDelta = new Vector2(_portrait ? 84f : 48f, _portrait ? 84f : 48f);
-            vsClose.AddComponent<Image>().color = Lift(t.BgCard, 0.40f);
-            var vsCloseBtn = vsClose.AddComponent<Button>();
-            vsCloseBtn.transition = Selectable.Transition.None;
-            vsCloseBtn.onClick.AddListener(() => _vsPanel.SetActive(false));
-            _vsPanel.SetActive(false);   // opened only by the VS button
-            var vsX = new GameObject("x"); vsX.transform.SetParent(vsClose.transform, false);
-            var vsXRt = vsX.AddComponent<RectTransform>();
-            vsXRt.anchorMin = Vector2.zero; vsXRt.anchorMax = Vector2.one;
-            vsXRt.offsetMin = vsXRt.offsetMax = Vector2.zero;
-            var vsXTxt = vsX.AddComponent<Text>();
-            vsXTxt.font = _font; vsXTxt.fontSize = _portrait ? 44 : 26; vsXTxt.color = Color.white;
-            vsXTxt.alignment = TextAnchor.MiddleCenter; vsXTxt.text = "X";
-            vsXTxt.supportRichText = false; vsXTxt.raycastTarget = false;
-            // The old panel background and its 1px border used to live here. When this method
-            // became a modal the scrim took over the background, but these were left behind --
-            // a SECOND Image on _vsPanel, which Unity refuses to add, so AddComponent returned
-            // null and the next line threw. That exception aborted the rest of BuildLayout,
-            // which is why the whole lower half of the menu disappeared with it.
-
-            // MMR label (top-left of panel)
-            var mmrGo = new GameObject("mmr"); mmrGo.transform.SetParent(vsCard.transform, false);
-            var mmrRt = mmrGo.AddComponent<RectTransform>();
-            mmrRt.anchorMin = new Vector2(0f, 1f); mmrRt.anchorMax = new Vector2(0.5f, 1f);
-            mmrRt.pivot = new Vector2(0f, 1f);
-            mmrRt.anchoredPosition = new Vector2(28f, -78f);
-            mmrRt.sizeDelta = new Vector2(-40f, 44f);
-            _mmrLbl = mmrGo.AddComponent<Text>();
-            _mmrLbl.font = _font; _mmrLbl.fontSize = _portrait ? 30 : UIScale.FontSmall;
-            _mmrLbl.color = new Color(1f, 0.82f, 0.18f); _mmrLbl.supportRichText = false; _mmrLbl.raycastTarget = false;
-
-            // Status text (top-right)
-            var stGo = new GameObject("status"); stGo.transform.SetParent(vsCard.transform, false);
-            var stRt = stGo.AddComponent<RectTransform>();
-            stRt.anchorMin = new Vector2(0.5f, 1f); stRt.anchorMax = new Vector2(1f, 1f);
-            stRt.pivot = new Vector2(1f, 1f);
-            stRt.anchoredPosition = new Vector2(-28f, -78f);
-            stRt.sizeDelta = new Vector2(-40f, 44f);
-            _vsStatusLbl = stGo.AddComponent<Text>();
-            _vsStatusLbl.font = _font; _vsStatusLbl.fontSize = _portrait ? 30 : UIScale.FontSmall;
-            _vsStatusLbl.color = t.TextMid; _vsStatusLbl.alignment = TextAnchor.MiddleRight;
-            _vsStatusLbl.supportRichText = false; _vsStatusLbl.raycastTarget = false;
-
-            // IP input field
-            var ipGo = new GameObject("IPField"); ipGo.transform.SetParent(vsCard.transform, false);
-            var ipRt = ipGo.AddComponent<RectTransform>();
-            ipRt.anchorMin = new Vector2(0.06f, 0.44f); ipRt.anchorMax = new Vector2(0.94f, 0.60f);
-            ipRt.offsetMin = new Vector2(8f, 8f); ipRt.offsetMax = new Vector2(-4f, -4f);
-            ipGo.AddComponent<Image>().color = new Color(t.BgDeep.r, t.BgDeep.g, t.BgDeep.b, 1f);
-            _ipField = ipGo.AddComponent<InputField>();
-            _ipField.text = GameSettings.LastPeerIP;
-            _ipField.characterLimit = 40;
-
-            var ipBrd = new GameObject("brd"); ipBrd.transform.SetParent(ipGo.transform, false);
-            ipBrd.transform.SetAsFirstSibling();
-            var ipBrdRt = ipBrd.AddComponent<RectTransform>();
-            ipBrdRt.anchorMin = Vector2.zero; ipBrdRt.anchorMax = Vector2.one;
-            ipBrdRt.offsetMin = new Vector2(-1, -1); ipBrdRt.offsetMax = new Vector2(1, 1);
-            ipBrd.AddComponent<Image>().color = new Color(t.Accent.r, t.Accent.g, t.Accent.b, 0.35f);
-
-            var ipTxtGo = new GameObject("txt"); ipTxtGo.transform.SetParent(ipGo.transform, false);
-            var ipTxtRt = ipTxtGo.AddComponent<RectTransform>();
-            ipTxtRt.anchorMin = Vector2.zero; ipTxtRt.anchorMax = Vector2.one;
-            ipTxtRt.offsetMin = new Vector2(6, 0); ipTxtRt.offsetMax = new Vector2(-6, 0);
-            var ipTxt = ipTxtGo.AddComponent<Text>();
-            ipTxt.font = _font; ipTxt.fontSize = _portrait ? 28 : UIScale.FontSmall; ipTxt.color = t.TextBright;
-            ipTxt.alignment = TextAnchor.MiddleLeft; ipTxt.supportRichText = false;
-            _ipField.textComponent = ipTxt;
-
-            var ipPHGo = new GameObject("ph"); ipPHGo.transform.SetParent(ipGo.transform, false);
-            var ipPHRt = ipPHGo.AddComponent<RectTransform>();
-            ipPHRt.anchorMin = Vector2.zero; ipPHRt.anchorMax = Vector2.one;
-            ipPHRt.offsetMin = new Vector2(6, 0); ipPHRt.offsetMax = new Vector2(-6, 0);
-            var ipPHTxt = ipPHGo.AddComponent<Text>();
-            ipPHTxt.font = _font; ipPHTxt.fontSize = _portrait ? 28 : UIScale.FontSmall;
-            ipPHTxt.color = t.TextDim; ipPHTxt.alignment = TextAnchor.MiddleLeft;
-            ipPHTxt.text = "opponent IP…"; ipPHTxt.supportRichText = false; ipPHTxt.raycastTarget = false;
-            _ipField.placeholder = ipPHTxt;
-
-            // [HOST] button
-            var hostGo = new GameObject("HostBtn"); hostGo.transform.SetParent(vsCard.transform, false);
-            var hRt = hostGo.AddComponent<RectTransform>();
-            // Was 17% wide and 54% tall -- a sliver. Two equal buttons on one row now.
-            hRt.anchorMin = new Vector2(0.06f, 0.07f); hRt.anchorMax = new Vector2(0.48f, 0.37f);
-            hRt.offsetMin = new Vector2(4, 0); hRt.offsetMax = new Vector2(-4, 0);
-            var hBg = hostGo.AddComponent<Image>(); hBg.color = new Color(0.08f, 0.22f, 0.40f);
-            var hBrd2 = new GameObject("brd2"); hBrd2.transform.SetParent(hostGo.transform, false);
-            hBrd2.transform.SetAsFirstSibling();
-            var hBrd2Rt = hBrd2.AddComponent<RectTransform>();
-            hBrd2Rt.anchorMin = Vector2.zero; hBrd2Rt.anchorMax = Vector2.one;
-            hBrd2Rt.offsetMin = new Vector2(-1, -1); hBrd2Rt.offsetMax = new Vector2(1, 1);
-            hBrd2.AddComponent<Image>().color = new Color(0.30f, 0.72f, 1f, 0.70f);
-            var hTxtGo = new GameObject("txt"); hTxtGo.transform.SetParent(hostGo.transform, false);
-            var hTxtRt = hTxtGo.AddComponent<RectTransform>();
-            hTxtRt.anchorMin = Vector2.zero; hTxtRt.anchorMax = Vector2.one; hTxtRt.offsetMin = hTxtRt.offsetMax = Vector2.zero;
-            var hTxt = hTxtGo.AddComponent<Text>();
-            hTxt.font = _font; hTxt.fontSize = _portrait ? 30 : UIScale.FontSmall;
-            hTxt.fontStyle = FontStyle.Bold;
-            hTxt.color = Color.white; hTxt.alignment = TextAnchor.MiddleCenter; hTxt.text = "HOST"; hTxt.supportRichText = false; hTxt.raycastTarget = false;
-            var hostBtn = hostGo.AddComponent<Button>(); hostBtn.transition = Selectable.Transition.None;
-            hostBtn.onClick.AddListener(OnVsHostClicked);
-            hostGo.AddComponent<ButtonFeel>();
-
-            // [JOIN] button
-            var joinGo = new GameObject("JoinBtn"); joinGo.transform.SetParent(vsCard.transform, false);
-            var jRt = joinGo.AddComponent<RectTransform>();
-            jRt.anchorMin = new Vector2(0.52f, 0.07f); jRt.anchorMax = new Vector2(0.94f, 0.37f);
-            jRt.offsetMin = new Vector2(4, 0); jRt.offsetMax = new Vector2(-8f, 0);
-            var jBg = joinGo.AddComponent<Image>(); jBg.color = new Color(0.06f, 0.20f, 0.10f);
-            var jBrd2 = new GameObject("brd2"); jBrd2.transform.SetParent(joinGo.transform, false);
-            jBrd2.transform.SetAsFirstSibling();
-            var jBrd2Rt = jBrd2.AddComponent<RectTransform>();
-            jBrd2Rt.anchorMin = Vector2.zero; jBrd2Rt.anchorMax = Vector2.one;
-            jBrd2Rt.offsetMin = new Vector2(-1, -1); jBrd2Rt.offsetMax = new Vector2(1, 1);
-            jBrd2.AddComponent<Image>().color = new Color(0.20f, 1f, 0.45f, 0.60f);
-            var jTxtGo = new GameObject("txt"); jTxtGo.transform.SetParent(joinGo.transform, false);
-            var jTxtRt = jTxtGo.AddComponent<RectTransform>();
-            jTxtRt.anchorMin = Vector2.zero; jTxtRt.anchorMax = Vector2.one; jTxtRt.offsetMin = jTxtRt.offsetMax = Vector2.zero;
-            var jTxt = jTxtGo.AddComponent<Text>();
-            jTxt.font = _font; jTxt.fontSize = _portrait ? 30 : UIScale.FontSmall;
-            jTxt.fontStyle = FontStyle.Bold;
-            jTxt.color = new Color(0.22f, 1f, 0.48f); jTxt.alignment = TextAnchor.MiddleCenter; jTxt.text = "JOIN"; jTxt.supportRichText = false; jTxt.raycastTarget = false;
-            var joinBtn = joinGo.AddComponent<Button>(); joinBtn.transition = Selectable.Transition.None;
-            joinBtn.onClick.AddListener(OnVsJoinClicked);
-            joinGo.AddComponent<ButtonFeel>();
-
-            RefreshVsPanel();
-        }
-
-        void RefreshVsPanel()
-        {
-            bool on = GameSettings.CompetitiveMode;
-            _vsBtnBg.color  = on ? new Color(0.05f, 0.14f, 0.30f) : new Color(0.10f, 0.10f, 0.14f);
-            _vsBtnTxt.text  = on ? "▶ VS ON" : "VS OFF";
-            _vsBtnTxt.color = on ? new Color(0.30f, 0.72f, 1f) : new Color(0.45f, 0.48f, 0.55f);
-            // Was _vsPanel.SetActive(on) -- so the panel appeared on its own whenever
-            // CompetitiveMode happened to be saved as true. That was fine while it was an
-            // inline strip; a MODAL has to open on a deliberate click and nothing else.
-            // This method now only refreshes contents; visibility belongs to the button.
-            // Speed picker and the VS panel share the band under DEPLOY — only one at a time.
-            if (_speedRoot != null) _speedRoot.SetActive(!on);
-
-            if (on)
-            {
-                _mmrLbl.text = $"MMR  {PlayerProgress.MMR}";
-                var net = NWNet.Inst;
-                _vsStatusLbl.text = net != null ? net.StatusText : "Disconnected";
-                _vsStatusLbl.color = (net != null && net.IsConnected)
-                    ? new Color(0.25f, 1f, 0.45f)
-                    : new Color(0.55f, 0.58f, 0.65f);
-            }
-        }
-
-        void ToggleVsMode()
-        {
-            GameSettings.CompetitiveMode = !GameSettings.CompetitiveMode;
-            if (!GameSettings.CompetitiveMode) NWNet.Inst?.Disconnect();
-            RefreshVsPanel();
-            // The button is the toggle; turning VS ON also opens the panel so the host/join
-            // controls are right there. Turning it off closes it. Dismissing the panel with
-            // the X leaves VS in whatever state it was -- closing a sheet is not a decision.
-            if (_vsPanel != null)
-            {
-                _vsPanel.SetActive(GameSettings.CompetitiveMode);
-                if (GameSettings.CompetitiveMode) _vsPanel.transform.SetAsLastSibling();
-            }
-        }
-
-        void OnVsHostClicked()
-        {
-            EnsureNet();
-            NWNet.Inst.StartHost();
-            NWNet.Inst.OnConnected    += OnVsConnected;
-            NWNet.Inst.OnDisconnected += OnVsDisconnected;
-            RefreshVsPanel();
-        }
-
-        void OnVsJoinClicked()
-        {
-            string ip = _ipField != null ? _ipField.text.Trim() : GameSettings.LastPeerIP;
-            if (string.IsNullOrEmpty(ip)) ip = "127.0.0.1";
-            GameSettings.LastPeerIP = ip;
-            EnsureNet();
-            NWNet.Inst.JoinHost(ip);
-            NWNet.Inst.OnConnected    += OnVsConnected;
-            NWNet.Inst.OnDisconnected += OnVsDisconnected;
-            RefreshVsPanel();
-        }
-
-        void OnVsConnected()   => RefreshVsPanel();
-        void OnVsDisconnected() => RefreshVsPanel();
-
-        static void EnsureNet()
-        {
-            if (NWNet.Inst == null)
-            {
-                var go = new GameObject("[NWNet]");
-                go.AddComponent<NWNet>();
-            }
-        }
-
-        void Update()
-        {
-            // Keep VS status text current while the screen is open
-            if (GameSettings.CompetitiveMode && _vsStatusLbl != null && NWNet.Inst != null)
-            {
-                _vsStatusLbl.text = NWNet.Inst.StatusText;
-                _vsStatusLbl.color = NWNet.Inst.IsConnected
-                    ? new Color(0.25f, 1f, 0.45f)
-                    : new Color(0.55f, 0.58f, 0.65f);
-            }
-        }
-
         // ─────────────────────────────────────────── interaction ─────────────────
 
         /// <summary>Opens the progress / ghost-ladder sheet.</summary>
@@ -2421,7 +2299,6 @@ namespace NW.App
         {
             if (rec == null) return;
             AudioManager.Play(AudioManager.Sfx.Click);
-            GameSettings.CompetitiveMode = false;   // ghost mode owns the result path, not LAN VS
             BattleScene.PendingGhost   = rec;
             GameSettings.SelectedLevel = rec.level;
             _hoveredLevel              = rec.level;
@@ -2433,15 +2310,6 @@ namespace NW.App
         void LaunchBattle()
         {
             if (!PlayerProgress.IsLevelUnlocked(_hoveredLevel)) return;
-            if (GameSettings.CompetitiveMode && (NWNet.Inst == null || !NWNet.Inst.IsConnected))
-            {
-                // VS mode is on but no opponent is connected. Dead-ending here silently traps
-                // anyone who just wants to play solo (the flag persists across sessions). A VS
-                // host/joiner connects via the HOST/JOIN buttons first, so DEPLOY-while-
-                // disconnected always means "play solo" — drop VS mode and launch the level.
-                GameSettings.CompetitiveMode = false;
-                RefreshVsPanel();
-            }
             gameObject.SetActive(false);
             OnLevelSelected?.Invoke(_hoveredLevel);
         }
@@ -2824,8 +2692,10 @@ namespace NW.App
             for (int i = 0; i < n; i++)
             {
                 var e = list[i];
+                string spd    = e.speed > 1.01f || (e.speed > 0f && e.speed < 0.99f)
+                                    ? $"  ×{e.speed:0.#}" : "";
                 string left  = $"#{e.rank}   {e.pilot}{(e.isYou ? "  (you)" : "")}   MMR {e.mmr}";
-                string right = (e.won ? "WIN " : "LOST ") + FmtDur(e.DurationSeconds);
+                string right = (e.won ? "WIN " : "LOST ") + FmtDur(e.DurationSeconds) + spd;
                 Color col = e.won ? new Color(0.55f, 0.95f, 0.68f) : new Color(0.95f, 0.6f, 0.62f);
                 if (e.isYou)
                 {

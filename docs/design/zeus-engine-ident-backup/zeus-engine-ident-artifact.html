@@ -1,0 +1,660 @@
+<title>Zeus Engine Ident</title>
+<meta name="description" content="The Zeus Engine cold open with options to choose: three ENGINE idle-life treatments, three ZEUS display faces, and three thunder sounds, over the jagged lightning warp." />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Pirata+One&family=Metal+Mania&family=Orbitron:wght@700;900&family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" />
+
+<style>
+  :root {
+    color-scheme: dark;
+    --void:#05060d; --char:#0b0d18; --hairline:#2c3350; --ash:#8a93ad; --chalk:#e4e9f6;
+    --accent:#8fb4ff; --accent2:#3350c8;   /* royal blue */
+    --measure:62ch;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0;
+    background:radial-gradient(120% 70% at 50% -8%, #101636 0%, rgba(16,22,54,0) 55%), var(--void);
+    color:var(--ash); font:400 1.02rem/1.62 "Barlow",system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1000px; margin:0 auto; padding:0 24px; }
+  .defs { position:absolute; width:0; height:0; overflow:hidden; }
+
+  /* ================= STAGE ================= */
+  .stage-outer { padding:32px 0 4px; }
+  .toolbar { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  .tgroup { display:flex; gap:6px; align-items:center; }
+  .tgroup > span { font:600 .68rem/1 "Barlow Semi Condensed",sans-serif; letter-spacing:.16em;
+                   text-transform:uppercase; color:#6a7590; margin-right:4px; }
+  .toolbar button {
+    font:600 .74rem/1 "Barlow Semi Condensed",sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ash); background:rgba(13,17,34,.6); border:1px solid var(--hairline); border-radius:3px;
+    padding:8px 13px; cursor:pointer; transition:color .15s,border-color .15s,background .15s;
+  }
+  .toolbar button:hover { color:var(--chalk); border-color:var(--accent2); }
+  .toolbar button[aria-pressed="true"] { color:var(--void); background:var(--accent); border-color:var(--accent); }
+  .toolbar button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .stage {
+    position:relative; width:100%; aspect-ratio:16/9; max-height:600px;
+    border:1px solid var(--hairline); border-radius:6px; overflow:hidden; isolation:isolate;
+    background:
+      radial-gradient(78% 60% at 50% 32%, #131c40 0%, rgba(19,28,64,0) 66%),
+      linear-gradient(180deg, #06080f 0%, #0a0d1c 58%, #100b0a 100%);
+  }
+  .stage::before {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:4;
+    box-shadow: inset 0 0 120px 24px rgba(0,0,0,.62), inset 0 0 40px rgba(0,0,0,.5);
+    transition: box-shadow .5s ease;
+  }
+  .stage.hot::before { box-shadow: inset 0 0 90px 10px rgba(30,16,6,.35), inset 0 0 220px 44px rgba(255,120,40,.11); }
+
+  .haze {
+    position:absolute; inset:-12%; pointer-events:none;
+    background:
+      radial-gradient(42% 58% at 26% 42%, rgba(63,110,255,.12), transparent 70%),
+      radial-gradient(38% 52% at 78% 50%, rgba(255,140,60,.06), transparent 72%);
+    filter:blur(8px); animation:drift 18s ease-in-out infinite alternate;
+  }
+  @keyframes drift { from{transform:translate3d(-2%,0,0) scale(1.03);} to{transform:translate3d(3%,-2%,0) scale(1.07);} }
+
+  #fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+
+  .mark {
+    position:absolute; inset:0; z-index:3;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding-bottom:3%;
+  }
+
+  /* ---------- ZEUS ---------- */
+  .zeus {
+    position:relative; margin:0; line-height:.92;
+    font-family:"Cinzel","Times New Roman",serif; font-weight:900;
+    font-size:clamp(3rem,10vw,6.7rem); letter-spacing:.06em; color:#e9eeff;
+  }
+  /* ZEUS face options (JS toggles data-font on .zeus) */
+  .zeus[data-font="metal"]  { font-family:"Metal Mania", "Cinzel", serif; font-weight:400; letter-spacing:.03em; font-size:clamp(3.1rem,10.6vw,7rem); }
+  .zeus[data-font="pirata"] { font-family:"Pirata One", "Cinzel", serif;  font-weight:400; letter-spacing:.02em; font-size:clamp(3.2rem,11vw,7.2rem); }
+  .zeus[data-font="metal"] .ch:nth-child(1),  .zeus[data-font="metal"] .ch:nth-child(4)  { font-size:1.06em; }
+  .zeus[data-font="pirata"] .ch:nth-child(1), .zeus[data-font="pirata"] .ch:nth-child(4) { font-size:1.06em; }
+  .zeus .ch {
+    display:inline-block; position:relative; will-change:transform,opacity,filter;
+    background:linear-gradient(180deg, #ffffff 0%, #eef2ff 42%, #bcccff 78%, #8ea6ff 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    text-shadow:
+      0 0 3px #fff, 0 0 9px #eef3ff,
+      0 0 20px #6f8cff, 0 0 44px #2f4fd0, 0 0 92px rgba(47,79,208,.5);
+  }
+  .zeus .ch:nth-child(1), .zeus .ch:nth-child(4) { font-size:1.1em; }   /* Z and S taller */
+  .zeus::after {
+    content:attr(data-word); position:absolute; inset:0; z-index:-1;
+    color:#3f6bff; filter:blur(28px); opacity:.42;
+  }
+  .zeus::before {
+    content:attr(data-word); position:absolute; inset:0; z-index:-1;
+    color:#2f4fd0; transform:translateX(-1.5px); opacity:.28; mix-blend-mode:screen;
+  }
+  .lit .zeus::after { animation:breathe 3.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{opacity:.26; filter:blur(22px);} 50%{opacity:.56; filter:blur(34px);} }
+  .lit .zeus .ch { animation:flick 6s steps(1,end) infinite; }
+  @keyframes flick { 0%,7%,7.6%,41%,41.5%,100%{opacity:1;} 7.3%,41.3%{opacity:.86;} }
+
+  /* jagged electric materialise — flicker-in while an SVG warp (JS) crackles the letterforms */
+  .playing .zeus .ch {
+    opacity:0;
+    animation:jagIn .46s steps(1,end) both;
+    animation-delay:.30s;
+  }
+  @keyframes jagIn {
+    0%{opacity:0} 8%{opacity:1} 14%{opacity:.2} 20%{opacity:1} 28%{opacity:.55}
+    36%{opacity:1} 46%{opacity:.7} 56%{opacity:1} 100%{opacity:1}
+  }
+  .playing .zeus::after, .playing .zeus::before { opacity:0; }
+
+  .playing .rule { transform:scaleX(0); animation:grow .38s ease .82s forwards; }
+  @keyframes grow { to { transform:scaleX(1); } }
+
+  /* ---------- ENGINE: molten gradient wordmark, flares on the strike ---------- */
+  .engine {
+    position:relative; margin:.55em 0 0;
+    font-family:"Orbitron",system-ui,sans-serif; font-weight:700;
+    font-size:clamp(.82rem,2.5vw,1.28rem); letter-spacing:.42em; text-indent:.42em; text-align:center;
+    color:#ff7a2e;   /* solid fallback if background-clip:text is unsupported */
+    /* soft off-centre warm hotspots (static) over a smooth many-stop heat ramp — non-uniform, not flowy */
+    background:
+      radial-gradient(58% 150% at 26% -8%, rgba(255,246,214,.62) 0%, rgba(255,246,214,0) 55%),
+      radial-gradient(40% 120% at 74% 120%, rgba(255,120,40,.5) 0%, rgba(255,120,40,0) 60%),
+      radial-gradient(46% 130% at 52% 42%, rgba(255,182,92,.3) 0%, rgba(255,182,92,0) 62%),
+      linear-gradient(180deg,
+        #ffe9b8 0%, #ffd487 16%, #ffb457 32%, #ff9440 48%,
+        #ff6a24 64%, #e04d16 80%, #b23a10 91%, #7a260a 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    text-shadow:0 0 8px rgba(255,120,40,.5), 0 0 22px rgba(255,80,20,.3);
+    /* --eheat (JS): idle ~0.18, jumps to 1 on the strike, eases back.
+       --elife (keyframe): small idle-life wobble so it isn't dead-static. */
+    filter: brightness(calc(.84 + var(--eheat, .18) * 1.15 + var(--elife, 0) * .16))
+            saturate(calc(.95 + var(--eheat, .18) * .4 + var(--elife, 0) * .12));
+  }
+  @property --elife { syntax:"<number>"; inherits:true; initial-value:0; }
+  .engine.life-breathe { animation:elifeBreathe 4.6s ease-in-out infinite; }
+  .engine.life-flicker { animation:elifeFlicker 1.7s steps(1,end) infinite; }
+  .engine.life-shimmer { animation:elifeShimmer 3.1s ease-in-out infinite; }
+  @keyframes elifeBreathe { 0%,100%{ --elife:0; } 50%{ --elife:1; } }
+  @keyframes elifeShimmer { 0%{ --elife:.25 } 30%{ --elife:.8 } 55%{ --elife:.35 } 80%{ --elife:.7 } 100%{ --elife:.25 } }
+  @keyframes elifeFlicker {
+    0%{ --elife:.35 } 7%{ --elife:.95 } 12%{ --elife:.15 } 19%{ --elife:.7 } 26%{ --elife:.4 }
+    34%{ --elife:1 } 41%{ --elife:.3 } 52%{ --elife:.75 } 63%{ --elife:.2 } 74%{ --elife:.6 }
+    85%{ --elife:.4 } 93%{ --elife:.85 } 100%{ --elife:.35 }
+  }
+  .engine::before {   /* outer bloom, opacity tracks heat + a little life */
+    content:attr(data-word); position:absolute; left:0; right:0; top:0; z-index:-1;
+    color:#ff5f1e; -webkit-text-fill-color:#ff5f1e;
+    filter:blur(15px);
+    opacity:calc(.1 + var(--eheat, 0) * .78 + var(--elife, 0) * .12);
+  }
+
+  .rule {
+    height:2px; width:min(300px,54%); margin-top:14px;
+    background:linear-gradient(90deg, transparent, var(--accent2), var(--accent), var(--accent2), transparent);
+  }
+
+  #bolt { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; opacity:0; z-index:3; }
+  #bolt path { fill:none; stroke:#eaf7ff; stroke-width:3.4; stroke-linecap:round; stroke-linejoin:round; filter:url(#zap); }
+  #bolt .core { stroke-width:1.5; stroke:#fff; filter:none; }
+  #bolt .branch { stroke-width:2.2; opacity:.85; }
+  .flash { position:absolute; inset:0; background:#eef7ff; opacity:0; pointer-events:none; mix-blend-mode:screen; z-index:3; }
+  .impact { position:absolute; width:10px; height:10px; border-radius:50%; pointer-events:none; z-index:3;
+            background:radial-gradient(circle, #fff 0%, rgba(255,190,120,.7) 40%, transparent 75%);
+            opacity:0; transform:translate(-50%,-50%) scale(1); mix-blend-mode:screen; }
+
+  .replay {
+    position:absolute; right:14px; bottom:12px; z-index:6;
+    display:inline-flex; align-items:center; gap:8px; padding:8px 14px;
+    font:600 .78rem/1 "Barlow Semi Condensed",sans-serif; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--accent); background:rgba(9,12,26,.66); border:1px solid var(--accent2); border-radius:3px;
+    cursor:pointer; backdrop-filter:blur(4px); transition:background .15s,box-shadow .15s;
+  }
+  .replay:hover { background:rgba(18,26,54,.85); box-shadow:0 0 18px color-mix(in srgb,var(--accent2) 40%,transparent); }
+  .replay:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ================= PROSE ================= */
+  main { padding:38px 0 84px; }
+  section { margin-top:44px; } section:first-child { margin-top:26px; }
+  .eyebrow { font:600 .78rem/1 "Barlow Semi Condensed",sans-serif; letter-spacing:.28em;
+             text-transform:uppercase; color:var(--accent2); margin:0 0 12px; }
+  h2 { font-family:"Cinzel",serif; font-weight:700; font-size:1.56rem; color:var(--chalk); margin:0 0 .5em; text-wrap:balance; }
+  p { max-width:var(--measure); margin:0 0 1em; }
+  .lead { font-size:1.16rem; color:#c6cfe1; max-width:58ch; }
+  strong { color:var(--chalk); font-weight:600; } em { color:var(--accent); font-style:normal; }
+  code { font-family:"Barlow Semi Condensed",ui-monospace,monospace; color:var(--chalk);
+         background:rgba(63,110,255,.12); padding:.05em .35em; border-radius:3px; font-size:.92em; }
+  .vlist { list-style:none; padding:0; margin:6px 0 0; border-top:1px solid var(--hairline); }
+  .vlist li { display:grid; grid-template-columns:120px 1fr; gap:18px; padding:11px 2px;
+              border-bottom:1px solid var(--hairline); align-items:baseline; }
+  .vlist .k { font:600 .78rem/1.3 "Barlow Semi Condensed",sans-serif; letter-spacing:.05em;
+              text-transform:uppercase; color:#ff8f3a; }
+  .vlist .d { color:var(--ash); font-size:.95rem; } .vlist .d b { color:var(--chalk); font-weight:600; }
+  .foot { margin-top:52px; padding-top:20px; border-top:1px solid var(--hairline); font-size:.85rem; color:#6a7590; }
+  @media (max-width:700px){ .vlist li{ grid-template-columns:1fr; gap:3px; } .stage{ aspect-ratio:4/5; } .toolbar{ gap:12px; } }
+  @media (prefers-reduced-motion:reduce){
+    .haze,.lit .zeus::after,.lit .zeus .ch,.engine{ animation:none !important; }
+    .playing *{ animation-duration:.001s !important; animation-delay:0s !important; }
+  }
+</style>
+
+<svg class="defs" aria-hidden="true"><defs>
+  <filter id="zap" x="-40%" y="-40%" width="180%" height="180%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.02 0.05" numOctaves="2" seed="4" result="n">
+      <animate attributeName="seed" values="4;17;9;13" dur="0.16s" repeatCount="3" />
+    </feTurbulence>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="18" result="d" />
+    <feGaussianBlur in="d" stdDeviation="2" result="b" />
+    <feMerge><feMergeNode in="b" /><feMergeNode in="d" /></feMerge>
+  </filter>
+
+  <!-- ZEUS jagged materialise: fixed noise, animated displacement scale crackling down to 0 -->
+  <filter id="jag" x="-60%" y="-60%" width="220%" height="220%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.016 0.05" numOctaves="2" seed="8" result="n" />
+    <feDisplacementMap in="SourceGraphic" in2="n" xChannelSelector="R" yChannelSelector="G" scale="0">
+      <animate id="jagAnim" attributeName="scale" begin="indefinite" dur="0.44s" fill="freeze"
+               values="26;33;15;24;9;16;4;9;0" keyTimes="0;0.1;0.22;0.34;0.46;0.6;0.74;0.88;1" />
+    </feDisplacementMap>
+  </filter>
+</defs></svg>
+
+<div class="stage-outer wrap">
+  <div class="toolbar" role="group" aria-label="Controls">
+    <div class="tgroup"><span>ENGINE life</span>
+      <button type="button" data-life="breathe" aria-pressed="false">Breathe</button>
+      <button type="button" data-life="flicker" aria-pressed="true">Flicker</button>
+      <button type="button" data-life="shimmer" aria-pressed="false">Shimmer</button>
+    </div>
+    <div class="tgroup"><span>ZEUS face</span>
+      <button type="button" data-font="metal" aria-pressed="true">Metal</button>
+      <button type="button" data-font="pirata" aria-pressed="false">Pirata</button>
+      <button type="button" data-font="roman" aria-pressed="false">Roman</button>
+    </div>
+    <div class="tgroup"><span>Thunder crackle</span>
+      <button type="button" data-thd="faint" aria-pressed="false">Faint</button>
+      <button type="button" data-thd="balanced" aria-pressed="true">Balanced</button>
+      <button type="button" data-thd="pops" aria-pressed="false">Pops</button>
+      <button type="button" data-thd="rolling" aria-pressed="false">Rolling</button>
+      <button type="button" id="sound" aria-pressed="true">Sound&nbsp;on</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="haze"></div>
+    <canvas id="fx"></canvas>
+    <svg id="bolt" viewBox="0 0 480 270" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="mark">
+      <h1 class="zeus" data-word="ZEUS"><span class="ch">Z</span><span class="ch">E</span><span class="ch">U</span><span class="ch">S</span></h1>
+      <p class="engine" data-word="ENGINE">ENGINE</p>
+      <div class="rule"></div>
+    </div>
+    <div class="flash" id="flash"></div>
+    <div class="impact" id="impact"></div>
+    <button class="replay" id="replay" type="button">▶ Replay</button>
+  </div>
+</div>
+
+<main class="wrap">
+  <section>
+    <p class="eyebrow">Pass 10</p>
+    <h2>ENGINE = Flicker, ZEUS = Metal — tuning the crackle</h2>
+    <p class="lead">Your picks are set: ENGINE <em>Flicker</em>, face <em>Metal</em>. All four thunder
+      options are now the <strong>crackle family</strong> over the same weighty base (crack + chest +
+      deep sub + roll) — what changes is how loud and dense the electric ticks sit. The previous
+      crackle is dialled back; ticks also taper as they go so they don't dominate the tail.</p>
+    <ul class="vlist">
+      <li><span class="k">Faint</span><span class="d">Crackle is a whisper under the strike — 8 quiet low ticks. The bolt and the bass carry it.</span></li>
+      <li><span class="k">Balanced</span><span class="d">Default. 10 ticks at a moderate level across the first ~0.5&nbsp;s — audible electric texture, not the star.</span></li>
+      <li><span class="k">Pops</span><span class="d">6 fewer-but-lower ticks spread wider — distinct snaps rather than a fizz.</span></li>
+      <li><span class="k">Rolling</span><span class="d">15 very quiet ticks spread over ~1.3&nbsp;s so the whole tail keeps faintly snapping as it rolls off.</span></li>
+    </ul>
+    <p>Click each Thunder button to preview it. ENGINE-life and face toggles are still there if you
+      want to double-check, but Flicker + Metal are locked in.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Next</p>
+    <h2>Then it gets baked</h2>
+    <p>Give me one from each group (ENGINE life / ZEUS face / thunder) plus any tuning. I render
+      that combination to a short <code>.webm</code> with audio, loop a few seconds of idle on the
+      tail, and it drops into <code>EngineIntroScreen</code> on a <code>VideoPlayer</code> — tap still
+      skips to the NEON&nbsp;WARFARE toast.</p>
+  </section>
+
+  <p class="foot">Zeus Engine — cold-open study, pass 10 · press Replay to re-run · click a Thunder button to preview it.</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var stage  = document.getElementById("stage");
+  var cv     = document.getElementById("fx");
+  var ctx    = cv.getContext("2d");
+  var bolt   = document.getElementById("bolt");
+  var flash  = document.getElementById("flash");
+  var impact = document.getElementById("impact");
+  var zeus   = document.querySelector(".zeus");
+  var engine = document.querySelector(".engine");
+  var jagAnim = document.getElementById("jagAnim");
+
+  var soundOn = true, lifeKind = "flicker", fontKind = "metal", thunderKind = "balanced";
+
+  /* warm ember spark params (locked) */
+  var S = { burst:52, drizzleMs:190, drizzleN:[1,2], grav:0.13, drag:0.985, sp:[1.5,6],
+            sz:[1.2,2.8], decay:[0.014,0.032], lift:1.1,
+            hues:["255,120,40","255,170,80","255,235,190"] };
+
+  /* ================= canvas / measure ================= */
+  var W=0,H=0,DPR=1, zBox={x:0,y:0,w:0,h:0}, eBox={x:0,y:0,w:0,h:0};
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = r.width; H = r.height;
+    cv.width = W*DPR; cv.height = H*DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    measure();
+  }
+  window.addEventListener("resize", resize);
+  function measure() {
+    var s = stage.getBoundingClientRect();
+    var z = zeus.getBoundingClientRect(), e = engine.getBoundingClientRect();
+    zBox = { x:z.left-s.left, y:z.top-s.top, w:z.width, h:z.height };
+    eBox = { x:e.left-s.left, y:e.top-s.top, w:e.width, h:e.height };
+  }
+
+  /* ================= ENGINE heat (drives CSS var, no canvas) ================= */
+  var heat = 0.18, heatTarget = 0.18;
+  function updateHeat(dt) {
+    heat += (heatTarget - heat) * Math.min(1, 0.05*dt);
+    engine.style.setProperty("--eheat", heat.toFixed(3));
+  }
+
+  /* ================= sparks / embers ================= */
+  var bits = [];
+  function rnd(a,b){ return a + Math.random()*(b-a); }
+  function pick(a){ return a[Math.random()*a.length|0]; }
+  function addSpark(x,y,o) {
+    o = o || {};
+    var a = o.ang!=null ? o.ang : rnd(0,6.283);
+    var sp = o.sp!=null ? o.sp : rnd(S.sp[0], S.sp[1]);
+    bits.push({ t:"s", x:x, y:y, px:x, py:y,
+      vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - (o.lift!=null?o.lift:S.lift),
+      life:1, decay:o.decay || rnd(S.decay[0],S.decay[1]), grav:o.grav!=null?o.grav:S.grav, drag:S.drag,
+      hue:o.hue || pick(S.hues), sz:o.sz || rnd(S.sz[0],S.sz[1]), trail:true, glint:true });
+  }
+  function offZeus() {
+    var e = Math.random(), x, y, ang;
+    if (e < 0.62) { x = zBox.x + Math.random()*zBox.w; y = zBox.y + zBox.h*rnd(0.02,0.5); ang = rnd(-2.5,-0.7); }
+    else if (e < 0.81) { x = zBox.x + zBox.w*rnd(-0.02,0.05); y = zBox.y + Math.random()*zBox.h; ang = rnd(2.5,3.75); }
+    else { x = zBox.x + zBox.w*rnd(0.95,1.02); y = zBox.y + Math.random()*zBox.h; ang = rnd(-0.6,0.6); }
+    return { x:x, y:y, ang:ang };
+  }
+  function burstZeus(n){ for (var i=0;i<n;i++){ var p=offZeus(); addSpark(p.x,p.y,{ang:p.ang}); } }
+  function drizzleZeus(){
+    var k = S.drizzleN[0] + (Math.random()*(S.drizzleN[1]-S.drizzleN[0]+1)|0);
+    for (var i=0;i<k;i++){ var p=offZeus(); addSpark(p.x,p.y,{ang:p.ang, sp:rnd(S.sp[0],(S.sp[0]+S.sp[1])/2), sz:rnd(S.sz[0],(S.sz[0]+S.sz[1])/2)}); }
+  }
+
+  /* ================= main loop ================= */
+  var running=false, last=0;
+  function frame(t) {
+    if (!running) return;
+    var dt = Math.min(2.2, (t-last)/16.67 || 1); last = t;
+    updateHeat(dt);
+
+    ctx.clearRect(0,0,W,H);
+    ctx.globalCompositeOperation = "lighter";
+    for (var i=bits.length-1;i>=0;i--) {
+      var p = bits[i];
+      p.px = p.x; p.py = p.y;
+      if (p.t === "e") { p.vy *= Math.pow(0.995,dt); }
+      else { p.vy += p.grav*dt; var dg = Math.pow(p.drag||0.985,dt); p.vx *= dg; p.vy *= dg; }
+      p.x += p.vx*dt; p.y += p.vy*dt; p.life -= p.decay*dt;
+      if (p.life<=0 || p.y>H+10) { bits.splice(i,1); continue; }
+      var sz = p.sz; if (p.glint && Math.random()<0.04) sz *= 2.3;
+      ctx.globalAlpha = Math.max(0,p.life);
+      ctx.strokeStyle = ctx.fillStyle = "rgba("+p.hue+",1)";
+      ctx.shadowColor = "rgba("+p.hue+",0.9)"; ctx.shadowBlur = 8;
+      if (p.trail) { ctx.lineWidth = sz; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(p.px,p.py); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(p.x,p.y,sz,0,6.283); ctx.fill(); }
+    }
+    ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.globalCompositeOperation="source-over";
+    requestAnimationFrame(frame);
+  }
+  function startLoop(){ if(!running){ running=true; last=performance.now(); requestAnimationFrame(frame); } }
+
+  /* ================= bolt / flash / impact ================= */
+  function jag(x0,y0,x1,y1,segs,jit) {
+    var d = "M"+x0.toFixed(1)+" "+y0.toFixed(1);
+    for (var i=1;i<=segs;i++){ var f=i/segs;
+      var x = x0+(x1-x0)*f + (Math.random()-0.5)*jit*(1-Math.abs(f-0.5));
+      d += " L"+x.toFixed(1)+" "+(y0+(y1-y0)*f).toFixed(1); }
+    return d;
+  }
+  function clearBolt(){ while(bolt.firstChild) bolt.removeChild(bolt.firstChild); }
+  function pth(d,cls){ var p=document.createElementNS(SVGNS,"path"); p.setAttribute("d",d); if(cls) p.setAttribute("class",cls); bolt.appendChild(p); return p; }
+  function strike() {
+    clearBolt();
+    var mx=240, my=168;
+    function mk(){ return jag(mx+(Math.random()-0.5)*30,-14, mx+(Math.random()-0.5)*20,my, 10,58); }
+    var m = pth(mk());
+    pth(jag(mx-4,my*0.4,  mx-58,my*0.72, 5,34),"branch");
+    pth(jag(mx+6,my*0.56, mx+52,my*0.88, 4,30),"branch");
+    var c = pth(m.getAttribute("d"),"core");
+    bolt.style.opacity="1";
+    [1,0.28,1,0.5,1,0].forEach(function(o,i){
+      tid(setTimeout(function(){ bolt.style.opacity=String(o);
+        if(o===1&&i){ var nd=mk(); m.setAttribute("d",nd); c.setAttribute("d",nd); } }, 26+i*46));
+    });
+    tid(setTimeout(function(){ bolt.style.opacity="0"; }, 520));
+  }
+  function doFlash(){ flash.animate([{opacity:0},{opacity:0.9,offset:0.14},{opacity:0}], {duration:230,easing:"ease-out"}); }
+  function doImpact(){
+    impact.style.left = "50%";
+    impact.style.top = ((zBox.y + zBox.h*0.85) / H * 100) + "%";
+    impact.animate([
+      {opacity:0, transform:"translate(-50%,-50%) scale(1)"},
+      {opacity:1, transform:"translate(-50%,-50%) scale(9)", offset:0.25},
+      {opacity:0, transform:"translate(-50%,-50%) scale(22)"}], {duration:520, easing:"cubic-bezier(.2,.7,.3,1)"});
+  }
+
+  /* ================= ZEUS jagged warp + strike blow-out (all inline, no CSS-anim clash) ================= */
+  function jagZeus() {
+    try { jagAnim.beginElement(); } catch (e) {}
+    zeus.style.filter = "url(#jag) brightness(2.7)";
+    tid(setTimeout(function(){ zeus.style.filter = "url(#jag) brightness(1.5)"; }, 120));
+    tid(setTimeout(function(){ zeus.style.filter = "url(#jag) brightness(1.12)"; }, 270));
+    tid(setTimeout(function(){ zeus.style.filter = "url(#jag)"; }, 400));
+    tid(setTimeout(function(){ zeus.style.filter = ""; }, 560));
+  }
+
+  /* ================= thunder (noise, no tones) ================= */
+  var AC=null;
+  function actx(){ if(!AC){ var C=window.AudioContext||window.webkitAudioContext; if(!C) return null; AC=new C(); }
+    if(AC.state==="suspended") AC.resume(); return AC; }
+  window.addEventListener("pointerdown", function once(){ actx(); window.removeEventListener("pointerdown", once); }, {once:true});
+  function noiseSrc(c,secs){ var n=Math.floor(c.sampleRate*secs), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+    for(var i=0;i<n;i++) d[i]=Math.random()*2-1; var s=c.createBufferSource(); s.buffer=b; return s; }
+  function roughCurve(base, n, jitter) {
+    var a = new Float32Array(n); a[0] = 0;
+    for (var i=1;i<n;i++) {
+      var env = Math.pow(1 - i/n, 1.4);                 // overall decay
+      a[i] = Math.max(0.0008, env * base * (0.55 + Math.random()*jitter));
+    }
+    a[n-1] = 0.0008;
+    return a;
+  }
+  // Crackle family — same weighty base (crack + chest + sub + roll + after-rolls);
+  // what changes is how the electric ticks read: count, loudness, pitch, spread.
+  var CRK_BASE = { subG:0.82, subLen:2.6, roll:0.5, rollLen:2.2 };
+  var THD = {
+    faint:    { crk:{ n:8,  g:[0.05,0.10], hp:[1100,2600], span:0.62, dur:[0.016,0.04] } },
+    balanced: { crk:{ n:10, g:[0.08,0.15], hp:[1300,3000], span:0.5,  dur:[0.014,0.036] } },
+    pops:     { crk:{ n:6,  g:[0.12,0.20], hp:[800,1900],  span:0.78, dur:[0.03,0.075] } },
+    rolling:  { crk:{ n:15, g:[0.045,0.11],hp:[1100,2900], span:1.35, dur:[0.014,0.04] } }
+  };
+  function tick(c, bus, at, dur, hz, gain) {
+    var s = noiseSrc(c, dur + 0.02);
+    var f = c.createBiquadFilter(); f.type = "highpass"; f.frequency.value = hz;
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 7500;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(gain, at + 0.0025);
+    g.gain.exponentialRampToValueAtTime(0.0006, at + dur);
+    s.connect(f); f.connect(lp); lp.connect(g); g.connect(bus);
+    s.start(at); s.stop(at + dur + 0.02);
+  }
+  function thunder() {
+    if (!soundOn) return;
+    var c = actx(); if (!c) return;
+    var t = c.currentTime;
+    var K = THD[thunderKind] || THD.balanced, B = CRK_BASE, crk = K.crk;
+
+    var comp = c.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 4;
+    comp.attack.value = 0.004; comp.release.value = 0.25;
+    var out = c.createGain(); out.gain.value = 1.12;
+    comp.connect(out); out.connect(c.destination);
+    var bus = comp;
+
+    // CRACK — near strike, present but not the star
+    var s1 = noiseSrc(c,0.3);
+    var hp1 = c.createBiquadFilter(); hp1.type="highpass";
+    hp1.frequency.setValueAtTime(4200,t); hp1.frequency.exponentialRampToValueAtTime(900,t+0.12);
+    var g1 = c.createGain();
+    g1.gain.setValueAtTime(0.0001,t);
+    g1.gain.exponentialRampToValueAtTime(0.82,t+0.003);
+    g1.gain.exponentialRampToValueAtTime(0.03,t+0.19);
+    s1.connect(hp1); hp1.connect(g1); g1.connect(bus); s1.start(t); s1.stop(t+0.3);
+
+    // CHEST — low-mid body / weight
+    var s2 = noiseSrc(c,0.55);
+    var lp2 = c.createBiquadFilter(); lp2.type="lowpass"; lp2.frequency.value = 1100; lp2.Q.value = 0.6;
+    var g2 = c.createGain();
+    g2.gain.setValueAtTime(0.0001,t);
+    g2.gain.exponentialRampToValueAtTime(0.8,t+0.01);
+    g2.gain.exponentialRampToValueAtTime(0.05,t+0.5);
+    s2.connect(lp2); lp2.connect(g2); g2.connect(bus); s2.start(t); s2.stop(t+0.55);
+
+    // SUB RUMBLE — deep bed + LFO churn (the bass / depth)
+    var s3 = noiseSrc(c,B.subLen);
+    var lp3 = c.createBiquadFilter(); lp3.type="lowpass";
+    lp3.frequency.setValueAtTime(135,t); lp3.frequency.exponentialRampToValueAtTime(58,t+B.subLen*0.85);
+    var ls3 = c.createBiquadFilter(); ls3.type="lowshelf"; ls3.frequency.value = 90; ls3.gain.value = 8;
+    var g3 = c.createGain();
+    g3.gain.setValueAtTime(0.0001,t);
+    g3.gain.setValueCurveAtTime(roughCurve(B.subG, 40, 0.9), t+0.02, B.subLen-0.1);
+    var lfo = c.createOscillator(); lfo.type = "triangle"; lfo.frequency.value = 4.6;
+    var lfoG = c.createGain(); lfoG.gain.value = 0.35;
+    lfo.connect(lfoG); lfoG.connect(g3.gain);
+    s3.connect(lp3); lp3.connect(ls3); ls3.connect(g3); g3.connect(bus);
+    s3.start(t); s3.stop(t+B.subLen); lfo.start(t); lfo.stop(t+B.subLen);
+
+    // ROLL — lowpassed rumble texture
+    var s4 = noiseSrc(c,B.rollLen+0.2);
+    var lp4 = c.createBiquadFilter(); lp4.type="lowpass";
+    lp4.frequency.setValueAtTime(900,t); lp4.frequency.exponentialRampToValueAtTime(240,t+B.rollLen*0.85);
+    var g4 = c.createGain();
+    g4.gain.setValueAtTime(0.0001,t+0.03);
+    g4.gain.setValueCurveAtTime(roughCurve(B.roll, 40, 1.1), t+0.05, B.rollLen);
+    s4.connect(lp4); lp4.connect(g4); g4.connect(bus); s4.start(t); s4.stop(t+B.rollLen+0.2);
+
+    // CRACKLE ticks — count / gain / pitch / spread per option; gain tapers over the span
+    for (var q=0;q<crk.n;q++) {
+      var f01 = q / Math.max(1, crk.n - 1);
+      var at2 = t + 0.008 + Math.random()*crk.span;
+      var taper = 1 - 0.6*f01;                                  // later ticks quieter
+      var gv = (crk.g[0] + Math.random()*(crk.g[1]-crk.g[0])) * taper;
+      var hz = crk.hp[0] + Math.random()*(crk.hp[1]-crk.hp[0]);
+      var dv = crk.dur[0] + Math.random()*(crk.dur[1]-crk.dur[0]);
+      tick(c, bus, at2, dv, hz, gv);
+    }
+
+    // DISTANT AFTER-ROLLS
+    for (var k=0;k<3;k++) {
+      var ct = t + 0.6 + Math.random()*1.5;
+      var sk = noiseSrc(c,0.6);
+      var lk = c.createBiquadFilter(); lk.type="lowpass"; lk.frequency.value = 260 + Math.random()*180;
+      var gk = c.createGain();
+      gk.gain.setValueAtTime(0.0001,ct);
+      gk.gain.exponentialRampToValueAtTime(0.2 + Math.random()*0.12, ct+0.03);
+      gk.gain.exponentialRampToValueAtTime(0.0008, ct+0.45);
+      sk.connect(lk); lk.connect(gk); gk.connect(bus); sk.start(ct); sk.stop(ct+0.6);
+    }
+  }
+
+  /* ================= idle ================= */
+  var idle = [];
+  function startIdle() {
+    stopIdle();
+    if (reduce) return;
+    idle.push(setInterval(drizzleZeus, S.drizzleMs));
+    idle.push(setInterval(function(){
+      var y = (zBox.y + zBox.h*0.5)/H*270, x0 = zBox.x/W*480, x1 = (zBox.x+zBox.w)/W*480;
+      clearBolt();
+      var p = document.createElementNS(SVGNS,"path");
+      p.setAttribute("d", jag(x0,y,x1,y,8,20)); p.setAttribute("class","core");
+      bolt.appendChild(p); bolt.style.opacity="0.8";
+      setTimeout(function(){ bolt.style.opacity="0"; }, 110);
+    }, 5600));
+  }
+  function stopIdle(){ idle.forEach(clearInterval); idle=[]; }
+
+  /* ================= orchestration ================= */
+  var timers = [];
+  function tid(id){ timers.push(id); return id; }
+  function clearTimers(){ timers.forEach(clearTimeout); timers=[]; }
+  function at(ms,fn){ tid(setTimeout(fn,ms)); }
+
+  function settle() {
+    stage.classList.remove("playing","hot");
+    stage.classList.add("lit");
+    zeus.classList.remove("struck");
+    zeus.style.filter = "";
+    bolt.style.opacity="0";
+    heatTarget = 0.18;
+    startIdle();
+  }
+  function play() {
+    clearTimers(); stopIdle();
+    bits.length = 0;
+    bolt.style.opacity="0";
+    zeus.style.filter = "";
+    heat = 0.18; heatTarget = 0.18;
+    measure(); startLoop();
+    if (reduce) { settle(); return; }
+
+    stage.classList.remove("lit");
+    stage.classList.add("playing");
+    zeus.classList.remove("struck");
+    void stage.offsetWidth;
+
+    var TS = 300;
+    at(TS, function () {
+      strike(); doFlash(); doImpact(); thunder(); jagZeus();
+      stage.classList.add("hot");
+      heatTarget = 1.0;                       // ENGINE flares
+      burstZeus(S.burst);
+    });
+    at(TS + 220, function () { heatTarget = 0.62; });
+    at(TS + 260, function () { burstZeus(Math.round(S.burst*0.4)); });
+    at(TS + 470, function () { burstZeus(Math.round(S.burst*0.3)); });
+    at(TS + 700, function () { stage.classList.remove("hot"); });
+    at(TS + 950, function () { heatTarget = 0.34; });
+    at(TS + 1850, function () { heatTarget = 0.18; });
+    at(TS + 2050, settle);
+  }
+  document.getElementById("replay").addEventListener("click", play);
+
+  /* ================= controls ================= */
+  function group(attr, apply, cb) {
+    var btns = [].slice.call(document.querySelectorAll("[" + attr + "]"));
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var v = b.getAttribute(attr);
+        btns.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        apply(v);
+        if (cb) cb(v);
+      });
+    });
+  }
+  function setLife(v) {
+    lifeKind = v;
+    engine.classList.remove("life-breathe", "life-flicker", "life-shimmer");
+    engine.classList.add("life-" + v);
+  }
+  function setFont(v) {
+    fontKind = v;
+    if (v === "roman") zeus.removeAttribute("data-font");
+    else zeus.setAttribute("data-font", v);
+    measure();
+  }
+  function setThd(v) { thunderKind = v; }
+
+  group("data-life", setLife);
+  group("data-font", setFont, function () { play(); });
+  group("data-thd",  setThd,  function () { if (soundOn) { actx(); thunder(); } });
+
+  var soundBtn = document.getElementById("sound");
+  soundBtn.addEventListener("click", function () {
+    soundOn = !soundOn;
+    soundBtn.setAttribute("aria-pressed", String(soundOn));
+    soundBtn.innerHTML = soundOn ? "Sound&nbsp;on" : "Sound&nbsp;off";
+    if (soundOn) { actx(); thunder(); }
+  });
+
+  /* ================= boot ================= */
+  setLife("flicker"); setFont("metal");
+  resize();
+  startLoop();
+  settle();
+  at(320, play);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { measure(); });
+})();
+</script>

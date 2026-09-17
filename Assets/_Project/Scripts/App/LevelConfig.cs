@@ -79,7 +79,7 @@ namespace NW.App
         public static float CoreHp(int level) => 220f + (level - 1) * 52f;
 
         /// <summary>Tokens rewarded per game on this level (base; multiplied by score).</summary>
-        public static int BaseTokenReward(int level) => 10 + level * 5;
+        public static int BaseTokenReward(int level) => 15 + level * 7;
 
         public static string LevelName(int level)
         {

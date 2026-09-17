@@ -5,7 +5,6 @@ using UnityEngine.SceneManagement;
 using NW.Combat.Domain;
 using NW.Core;
 using NW.Data;
-using NW.Net;
 
 namespace NW.App
 {
@@ -149,8 +148,8 @@ namespace NW.App
             if (_battleStarted && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)))
                 TogglePause();
 
-            // Competitive / ghost overlay — ticks even while paused so dot pulses and flash fades
-            if ((GameSettings.CompetitiveMode || _ghostMode) && _compBar != null)
+            // Ghost overlay — ticks even while paused so the dot pulses and the flash fades
+            if (_ghostMode && _compBar != null)
                 TickCompOverlay();
 
             if (!_battleStarted || _session == null || _paused) return;
@@ -161,14 +160,10 @@ namespace NW.App
                 _bfView.PlayFx(_session.PendingFx[i]);
             _session.PendingFx.Clear();
 
-            // Drain crossover payloads this tick: transmit to a live peer, and/or record
-            // them into the ghost (they become the opponent's strikes on replay).
-            bool live = GameSettings.CompetitiveMode && NWNet.Inst != null && NWNet.Inst.IsConnected;
+            // Drain crossover payloads this tick, recording them into the ghost — they
+            // become the opponent's strikes on replay.
             foreach (var p in _session.PendingNetPayloads)
-            {
-                if (live) NWNet.Inst.SendCrossover(p.Kind, p.Lane, p.Damage);
                 _recorder?.RecordCrossover(_session.Combat.TickCount, p);
-            }
             _session.PendingNetPayloads.Clear();
 
             _boardView.Refresh();
@@ -181,22 +176,16 @@ namespace NW.App
                 bool playerWon = _session.Combat.Winner == Team.Player;
                 FinalizeGhostRecording(playerWon);
 
+                // Every match pays out: gems mined this match + a token reward (2x on a win).
+                // Ranked / ghost matches used to award nothing, which is why the shop was
+                // unreachable for anyone playing the ladder.
+                PlayerProgress.AwardPostGame(_session.Resources, GameSettings.SelectedLevel, playerWon);
+
                 if (_ghostMode)
                 {
                     int prev = PlayerProgress.MMR;
                     RankLadder.ApplyRanked(playerWon, _ghostOppMmr, _ghostOppPilot, _ghostLevel);
                     ShowMatchResult(playerWon, prev, PlayerProgress.MMR);
-                }
-                else if (GameSettings.CompetitiveMode)
-                {
-                    if (NWNet.Inst != null && !playerWon) NWNet.Inst.SendCoreDead();
-                    int prev = PlayerProgress.MMR;
-                    PlayerProgress.ApplyMatchResult(playerWon);
-                    ShowMatchResult(playerWon, prev, PlayerProgress.MMR);
-                }
-                else
-                {
-                    PlayerProgress.AwardPostGame(_session.Resources, GameSettings.SelectedLevel);
                 }
             }
 
@@ -769,7 +758,11 @@ namespace NW.App
         {
             TooltipSystem.Init(_font, _canvasGo.transform);
 
-            // Branded welcome splash once per app launch, then proceed.
+            // Cold launch: NEON WARFARE welcome toast → proceed. (ZEUS ENGINE studio splash was
+            // pulled 2026-09-11 — not satisfied with the ident, to be redone later. Script +
+            // baked flipbook sheets/audio removed from the project; source HTML design + the
+            // recording are preserved outside Unity — see LLM Wiki
+            // sources/2026-09-11-neon-warfare-zeus-engine-ident.md for where to pick it back up.)
             if (!_welcomeShown)
             {
                 _welcomeShown = true;
@@ -794,12 +787,23 @@ namespace NW.App
         private void ShowWelcome(System.Action onDone)
         {
             var theme = NeonTheme.Active;
+
+            // Opaque base, deliberately NOT part of the fade — the canvas's persistent background
+            // art (BuildCanvas's BG / Board_BgImage, always sitting underneath every screen) must
+            // never be exposed while this splash is fading in or out. That flash was the
+            // "rectangle" that used to show between the Zeus ident and this toast.
+            var baseGo = new GameObject("[WelcomeBase]");
+            baseGo.transform.SetParent(_canvasGo.transform, false);
+            var baseRt = baseGo.AddComponent<RectTransform>();
+            baseRt.anchorMin = Vector2.zero; baseRt.anchorMax = Vector2.one; baseRt.offsetMin = baseRt.offsetMax = Vector2.zero;
+            baseGo.transform.SetAsLastSibling();
+            baseGo.AddComponent<Image>().color = theme.BgDeep;
+
             var go = new GameObject("[Welcome]");
             go.transform.SetParent(_canvasGo.transform, false);
             var rt = go.AddComponent<RectTransform>();
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
-            go.transform.SetAsLastSibling();
-            go.AddComponent<Image>().color = theme.BgDeep;
+            go.transform.SetAsLastSibling();   // above baseGo
             var cg = go.AddComponent<CanvasGroup>();
 
             // Transparent-background emblem (AppIconGlyph) so it blends into the splash instead
@@ -837,12 +841,17 @@ namespace NW.App
 
             cg.alpha = 0f;
             Tween.Fade(cg, 0f, 1f, 0.4f);
-            Tween.Delay(1.7f, () =>
+            Tween.Delay(1.5f, () =>
+            {
+                // Build the next screen NOW and crossfade — firing onDone before the fade-out
+                // lets that screen come up on top while we're still visible, instead of after.
+                onDone?.Invoke();
                 Tween.Fade(cg, 1f, 0f, 0.4f, done: () =>
                 {
                     if (go != null) Destroy(go);
-                    onDone?.Invoke();
-                }));
+                    if (baseGo != null) Destroy(baseGo);
+                });
+            });
         }
 
         // Called directly by the "SWITCH PILOT" button on the level select screen
@@ -1037,11 +1046,8 @@ namespace NW.App
             _boardView.Init(_session, _boardRt, _font, availW: boardAvailW, availH: BOARD_H);
             _battleStarted = true;
 
-            if (GameSettings.CompetitiveMode || _ghostMode)
-            {
+            if (_ghostMode)
                 BuildCompOverlay();
-                if (GameSettings.CompetitiveMode && NWNet.Inst != null) SubscribeCompetitive();
-            }
 
             // Show the MENU button when the battle starts -- NOT the panel. _controlsPanel
             // is now the modal itself, so activating it here would pop the menu open on top
@@ -1090,24 +1096,6 @@ namespace NW.App
             Time.timeScale = 1f;
         }
 
-        void SubscribeCompetitive()
-        {
-            NWNet.Inst.OnCrossoverReceived += msg =>
-            {
-                if (_session != null && !_session.Combat.Finished)
-                    _session.Combat.DamagePlayerCore(msg.Damage);
-                ShowHitFlash(msg.Damage);
-            };
-            NWNet.Inst.OnOpponentDead += () =>
-            {
-                if (_session == null || _postGameDone) return;
-                _postGameDone = true;
-                FinalizeGhostRecording(true);
-                int prev = PlayerProgress.MMR;
-                PlayerProgress.ApplyMatchResult(true);
-                ShowMatchResult(true, prev, PlayerProgress.MMR);
-            };
-        }
 
         /// <summary>Seal the in-progress recording and write it to the local ghost pool.
         /// Safe to call once per match; a no-op if there is nothing to record.</summary>
@@ -1115,7 +1103,9 @@ namespace NW.App
         {
             CrashLog.Note($"match end {(playerWon ? "win" : "loss")} tick{(_session != null ? _session.Combat.TickCount : 0)}");
             if (_recorder == null) return;
-            var rec = _recorder.Finish(playerWon, _session != null ? _session.Combat.TickCount : 0);
+            var rec = _recorder.Finish(playerWon,
+                                       _session != null ? _session.Combat.TickCount : 0,
+                                       GameSettings.BattleSpeed);
             _recorder = null;
             if (rec != null)
             {
@@ -1242,15 +1232,6 @@ namespace NW.App
                 float gp = (Mathf.Sin(_dotPulseT) + 1f) * 0.5f;
                 _compDotTxt.text  = "◆ GHOST";
                 _compDotTxt.color = new Color(0.95f, 0.72f + gp * 0.12f, 0.20f);
-            }
-            else if (_compDotTxt != null && NWNet.Inst != null)
-            {
-                bool conn   = NWNet.Inst.IsConnected;
-                float pulse = (Mathf.Sin(_dotPulseT) + 1f) * 0.5f;
-                _compDotTxt.text  = conn ? "● LIVE" : "○ WAIT";
-                _compDotTxt.color = conn
-                    ? new Color(0.18f + pulse * 0.12f, 0.88f + pulse * 0.12f, 0.28f + pulse * 0.08f)
-                    : new Color(0.62f, 0.30f, 0.22f);
             }
 
             if (_hitFlashTimer > 0f)

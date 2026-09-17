@@ -93,21 +93,6 @@ namespace NW.App
             set { PlayerPrefs.SetFloat("gs_battlespeed", value); PlayerPrefs.Save(); }
         }
 
-        // ── competitive / VS mode ─────────────────────────────────────────────
-
-        public static bool CompetitiveMode
-        {
-            get => PlayerPrefs.GetInt("gs_comp_mode", 0) == 1;
-            set { PlayerPrefs.SetInt("gs_comp_mode", value ? 1 : 0); PlayerPrefs.Save(); }
-        }
-
-        /// <summary>Last successfully connected peer IP — pre-fills the join field.</summary>
-        public static string LastPeerIP
-        {
-            get => PlayerPrefs.GetString("gs_peer_ip", "127.0.0.1");
-            set { PlayerPrefs.SetString("gs_peer_ip", value); PlayerPrefs.Save(); }
-        }
-
         // ── diagnostics (crash / error reporting) ────────────────────────────
         // On by default: uncaught exceptions are reported to the Firestore `diagnostics`
         // collection so failures on real devices are visible. No personal data — a random

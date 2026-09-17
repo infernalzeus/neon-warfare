@@ -20,15 +20,32 @@ namespace NW.App
         public static readonly int[] Currency = new int[BoardModel.GemKindCount];
         public static readonly HashSet<int> UnlockedLevels = new();
 
-        // ── pilot identity (global, stable across sessions) ──────────────────────
+        // ── pilot identity (per save slot, stable across sessions) ───────────────
 
-        /// <summary>A stable per-install id. This is the pilot's display-side identity and the
-        /// leaderboard document key; a Firebase anon uid (if the online backend is enabled) is
-        /// mapped onto it at sign-in. Survives slot switches; only a full app-data wipe resets it.</summary>
+        /// <summary>The leaderboard document key and ghost-author id for one save slot. Each of
+        /// the 3 slots is its own leaderboard identity, so one device can hold up to 3 — that is
+        /// why this is keyed per slot, not per install. Lazily created; only deleting the slot
+        /// (or wiping app data) resets it.</summary>
+        public static string PilotIdForSlot(int slot)
+        {
+            string key = $"pp_s{slot}_pilot_id";
+            string id  = PlayerPrefs.GetString(key, "");
+            if (string.IsNullOrEmpty(id))
+            {
+                id = System.Guid.NewGuid().ToString("N");
+                PlayerPrefs.SetString(key, id);
+                PlayerPrefs.Save();
+            }
+            return id;
+        }
+
+        /// <summary>The active slot's pilot id. Falls back to a legacy per-install id only when
+        /// no slot is loaded yet (nothing writes to the leaderboard in that state).</summary>
         public static string PilotId
         {
             get
             {
+                if (CurrentSlot >= 0) return PilotIdForSlot(CurrentSlot);
                 string id = PlayerPrefs.GetString("pp_pilot_id", "");
                 if (string.IsNullOrEmpty(id))
                 {
@@ -40,16 +57,46 @@ namespace NW.App
             }
         }
 
-        /// <summary>The player's chosen display name — one per install, shown on every slot card
-        /// and every leaderboard row. Claimed as globally-unique via <see cref="UsernameService"/>.
-        /// Empty until the player sets one (then the game shows "PILOT").</summary>
+        /// <summary>The active slot's chosen display name, or "" if it's still the default
+        /// "PILOT n". Set routes to <see cref="SetSlotName"/>. Claimed as globally-unique via
+        /// <see cref="UsernameService"/> — one reserved name per slot.</summary>
         public static string PilotName
         {
-            get => PlayerPrefs.GetString("pp_pilotname", "");
-            set { PlayerPrefs.SetString("pp_pilotname", (value ?? "").Trim()); PlayerPrefs.Save(); }
+            get
+            {
+                if (CurrentSlot < 0) return "";
+                string n = PlayerPrefs.GetString(NameKey(CurrentSlot), "");
+                return IsSlotNameDefault(CurrentSlot) ? "" : n;
+            }
+            set { if (CurrentSlot >= 0) SetSlotName(CurrentSlot, value); }
         }
 
-        public static bool HasPilotName => !string.IsNullOrEmpty(PilotName);
+        public static bool HasPilotName => CurrentSlot >= 0 && !IsSlotNameDefault(CurrentSlot);
+
+        /// <summary>True when the slot's name is unset or still the bundled "PILOT n" placeholder.
+        /// The first real name is free; renaming from a real name costs tokens
+        /// (<see cref="RenameCostForSlot"/>).</summary>
+        public static bool IsSlotNameDefault(int slot)
+        {
+            string n = PlayerPrefs.GetString(NameKey(slot), "");
+            return string.IsNullOrEmpty(n) || n == $"PILOT {slot + 1}";
+        }
+
+        // ── pilot rename cost (per slot, escalating) ────────────────────────────
+        // First name on a fresh slot is free. Each rename after that costs
+        // 1000 * (renames so far + 1): 1000, then 2000, then 3000, …
+
+        public static int RenameCountForSlot(int slot)
+            => Mathf.Max(0, PlayerPrefs.GetInt($"pp_s{slot}_renames", 0));
+
+        public static int RenameCostForSlot(int slot)
+            => 1000 * (RenameCountForSlot(slot) + 1);
+
+        public static void BumpRenameCount(int slot)
+        {
+            PlayerPrefs.SetInt($"pp_s{slot}_renames", RenameCountForSlot(slot) + 1);
+            PlayerPrefs.Save();
+        }
 
         // ── dev conveniences (testing only) ─────────────────────────────────────
 
@@ -276,7 +323,12 @@ namespace NW.App
             PlayerPrefs.SetString(CurrencyKey(slot), dev ? DevCurrency : FreshCurrency);
             PlayerPrefs.SetString(UnlockKey(slot),   dev ? DevUnlocks  : FreshUnlocks);
             PlayerPrefs.SetString(NameKey(slot), $"PILOT {slot + 1}");
+            // Fresh leaderboard identity for this slot; a new pilot has renamed 0 times.
+            PlayerPrefs.DeleteKey($"pp_s{slot}_pilot_id");
+            PlayerPrefs.DeleteKey($"pp_s{slot}_username_key");
+            PlayerPrefs.SetInt($"pp_s{slot}_renames", 0);
             PlayerPrefs.Save();
+            PilotIdForSlot(slot);   // mint it now so the id is stable from the first match
             LoadSlot(slot);
         }
 
@@ -285,6 +337,9 @@ namespace NW.App
             PlayerPrefs.DeleteKey(CurrencyKey(slot));
             PlayerPrefs.DeleteKey(UnlockKey(slot));
             PlayerPrefs.DeleteKey(NameKey(slot));
+            PlayerPrefs.DeleteKey($"pp_s{slot}_pilot_id");
+            PlayerPrefs.DeleteKey($"pp_s{slot}_username_key");
+            PlayerPrefs.DeleteKey($"pp_s{slot}_renames");
             PlayerPrefs.Save();
             if (CurrentSlot == slot)
             {
@@ -311,14 +366,18 @@ namespace NW.App
 
         // ─────────────────────────────────────────────── mutate ───────────
 
-        public static void AwardPostGame(int[] earned, int level)
+        /// <summary>Pay out a finished match: gems mined this match + a token reward that
+        /// scales with level and DOUBLES on a win. Called for EVERY match type — solo, ranked
+        /// and ghost-challenge (BattleScene routed only solo here before, so ranked play earned
+        /// nothing and the shop was unreachable).</summary>
+        public static void AwardPostGame(int[] earned, int level, bool won = true)
         {
             for (int i = 0; i < BoardModel.GemKindCount && i < earned.Length; i++)
                 Currency[i] += earned[i];
             for (int i = 0; i < BoardModel.GemKindCount; i++)
                 if (Currency[i] > 9999) Currency[i] = 9999;
-            // Token reward scales with level
-            AddTokens(LevelConfig.BaseTokenReward(level));
+            // Token reward scales with level; a win pays double.
+            AddTokens(LevelConfig.BaseTokenReward(level) * (won ? 2 : 1));
             if (CurrentSlot >= 0) Save();
         }
 
@@ -361,23 +420,19 @@ namespace NW.App
         static string UnlockKey(int slot)   => $"pp_s{slot}_unlocked";
         static string NameKey(int slot)     => $"pp_s{slot}_name";
 
-        /// <summary>The name shown for this player everywhere (ghost authorship, leaderboard rows):
-        /// the globally-unique <see cref="PilotName"/> if they've set one, otherwise the active
-        /// slot's local name, otherwise "PILOT".</summary>
+        /// <summary>The name shown for this pilot everywhere (ghost authorship, leaderboard rows):
+        /// the active slot's name — the reserved one if set, otherwise its "PILOT n" default.</summary>
         public static string CurrentSlotName()
-        {
-            if (HasPilotName) return PilotName;
-            return CurrentSlot >= 0
+            => CurrentSlot >= 0
                 ? PlayerPrefs.GetString(NameKey(CurrentSlot), $"PILOT {CurrentSlot + 1}")
                 : "PILOT";
-        }
 
         /// <summary>Rename a save slot. The key was always written as "PILOT n" and never
         /// changed, so the field existed but nothing could set it.</summary>
         public static void SetSlotName(int slot, string name)
         {
             name = (name ?? "").Trim();
-            if (name.Length > 12) name = name.Substring(0, 12);
+            if (name.Length > UsernameService.MaxLen) name = name.Substring(0, UsernameService.MaxLen);
             if (name.Length == 0) name = $"PILOT {slot + 1}";
             PlayerPrefs.SetString(NameKey(slot), name);
             PlayerPrefs.Save();

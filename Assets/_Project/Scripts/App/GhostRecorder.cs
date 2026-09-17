@@ -55,12 +55,17 @@ namespace NW.App
         }
 
         /// <summary>Seal the recording. A match with no actions (instant loss, rage-quit)
-        /// returns null — a ghost that does nothing is not worth storing.</summary>
-        public GhostRecord Finish(bool pilotWon, int durationTicks)
+        /// returns null — a ghost that does nothing is not worth storing.
+        /// <paramref name="speed"/> is the BattleSpeed the match ran at; the board ranks on
+        /// <c>scoreTicks = durationTicks / speed</c> so a faster clear places higher.</summary>
+        public GhostRecord Finish(bool pilotWon, int durationTicks, float speed = 1f)
         {
             if (_rec.actions.Count == 0) return null;
             _rec.result        = pilotWon ? 1 : 0;
             _rec.durationTicks = durationTicks;
+            _rec.speed         = speed <= 0.05f ? 1f : speed;
+            _rec.scoreTicks    = System.Math.Max(1,
+                                     (int)System.Math.Round(durationTicks / (double)_rec.speed));
             _rec.recordedUtc   = System.DateTime.UtcNow.ToBinary();
             return _rec;
         }

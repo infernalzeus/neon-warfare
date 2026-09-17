@@ -126,7 +126,8 @@ namespace NW.App
         void BuildStatusLine()
         {
             var rt = GetComponent<RectTransform>();
-            var go = MakeRect(rt, "StatusLine", new Vector2(0.05f, 0.015f), new Vector2(0.95f, 0.075f));
+            // Sits in the narrow band between the slot cards (bottom edge 0.09) and the footer.
+            var go = MakeRect(rt, "StatusLine", new Vector2(0.05f, 0.052f), new Vector2(0.95f, 0.09f));
             _statusLine = go.AddComponent<Text>();
             _statusLine.font = _font; _statusLine.fontSize = UIScale.FontSmall;
             _statusLine.alignment = TextAnchor.MiddleCenter;
@@ -158,9 +159,9 @@ namespace NW.App
                 BuildSlotCard(rt, s, new Vector2(x0, 0.09f), new Vector2(x1, 0.845f));
             }
 
-            // Footer note
+            // Footer note — sits below the status line (which owns 0.052–0.09).
             var footGo = MakeRect(rt, "Footer",
-                new Vector2(0.06f, 0.015f), new Vector2(0.94f, 0.08f));
+                new Vector2(0.06f, 0.008f), new Vector2(0.94f, 0.046f));
             var foot = footGo.AddComponent<Text>();
             foot.font = _font; foot.fontSize = UIScale.FontSmall;
             foot.color = new Color(0.50f, 0.62f, 0.70f, 0.95f);
@@ -244,17 +245,17 @@ namespace NW.App
             nameTxt.supportRichText = false;
             nameTxt.color = Color.white;
             nameTxt.alignment = TextAnchor.MiddleCenter;
-            // One pilot name per player, shown on every card. Falls back to the slot's local
-            // name until the player picks one.
-            string shown = PlayerProgress.HasPilotName ? PlayerProgress.PilotName : name;
+            // Each slot carries its own name (and its own leaderboard identity). Shows the
+            // slot's "PILOT n" default until the player picks one.
+            string shown = name;
             nameTxt.text = shown;
             nameTxt.raycastTarget = false;
 
-            // Editing the name claims it as a globally-unique handle via UsernameService
-            // (Firestore-backed; falls back to a local-only name when offline).
+            // Editing the name claims it as a globally-unique handle for THIS slot via
+            // UsernameService (Firestore-backed; falls back to a local-only name when offline).
             var editGo = MakeRect(card, "nameEdit", Vector2.zero, Vector2.one);
             var editRt = editGo.GetComponent<RectTransform>();
-            editRt.anchorMin = new Vector2(0.04f, 0.735f);
+            editRt.anchorMin = new Vector2(0.04f, 0.756f);   // leaves a thin band below for the cost hint
             editRt.anchorMax = new Vector2(0.96f, 0.845f);
             editRt.offsetMin = editRt.offsetMax = Vector2.zero;
             var editImg = editGo.AddComponent<Image>();
@@ -270,30 +271,91 @@ namespace NW.App
             nRt.anchorMin = Vector2.zero; nRt.anchorMax = Vector2.one;
             nRt.offsetMin = new Vector2(6f, 0f); nRt.offsetMax = new Vector2(-6f, 0f);
             int capturedSlot = slot;
+
+            // Thin caption band just below the name field: the first name on a fresh slot is
+            // free; renaming after that costs tokens, escalating per slot (1000, 2000, 3000, …).
+            // The cost used to be a bare number with no indication of WHICH currency — the same
+            // shard-cluster token the Armory shop and gem converter use. Show that icon here too
+            // so a player recognises it as the currency they already have (or need to earn).
+            var hintGo = MakeRect(card, "renameHint",
+                new Vector2(0.06f, 0.733f), new Vector2(0.87f, 0.756f));
+            var hint = hintGo.AddComponent<Text>();
+            hint.font = _font; hint.fontSize = UIScale.FontTiny;
+            hint.alignment = TextAnchor.MiddleRight;
+            hint.horizontalOverflow = HorizontalWrapMode.Overflow;
+            hint.verticalOverflow = VerticalWrapMode.Overflow;
+            hint.raycastTarget = false;
+
+            var hintIconGo = MakeRect(card, "renameHintIcon", Vector2.zero, Vector2.zero);
+            var hintIconRt = hintIconGo.GetComponent<RectTransform>();
+            hintIconRt.anchorMin = hintIconRt.anchorMax = new Vector2(0.895f, 0.7445f);
+            hintIconRt.pivot = new Vector2(0f, 0.5f);
+            hintIconRt.sizeDelta = new Vector2(15f, 15f);
+            hintIconGo.AddComponent<TokenIconAnim>();
+
+            void RefreshHint()
+            {
+                bool free = PlayerProgress.IsSlotNameDefault(capturedSlot);
+                hint.text  = free ? "rename · free" : $"rename · {PlayerProgress.RenameCostForSlot(capturedSlot)}";
+                hint.color = free ? new Color(0.45f, 0.6f, 0.68f, 0.8f)
+                                  : new Color(1f, 0.78f, 0.32f, 0.85f);
+                hintIconGo.SetActive(!free);
+            }
+            RefreshHint();
+
             field.onEndEdit.AddListener(v =>
             {
-                string fallback = PlayerProgress.HasPilotName
-                    ? PlayerProgress.PilotName : $"PILOT {capturedSlot + 1}";
-                if (!UsernameService.IsValid(v))
+                string current  = PlayerProgress.GetSlotPreview(capturedSlot).name;
+                string fallback = current.Length > 0 ? current : $"PILOT {capturedSlot + 1}";
+                string desired  = UsernameService.Normalize(v);
+
+                if (!UsernameService.IsValid(desired))
                 {
                     field.text = fallback;
                     SetStatus($"Name must be {UsernameService.MinLen}–{UsernameService.MaxLen} letters or digits.",
                               new Color(1f, 0.5f, 0.4f));
                     return;
                 }
+                if (string.Equals(desired, current, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    field.text = fallback;   // no change — never charge
+                    return;
+                }
+
+                bool isRename = !PlayerProgress.IsSlotNameDefault(capturedSlot);
+                int  cost     = PlayerProgress.RenameCostForSlot(capturedSlot);
+                if (isRename && PlayerProgress.Tokens < cost)
+                {
+                    field.text = fallback;
+                    SetStatus($"Rename costs {cost} tokens — you have {PlayerProgress.Tokens}.",
+                              new Color(1f, 0.72f, 0.18f));
+                    return;
+                }
+
                 SetStatus("checking name…", TextQuiet);
-                UsernameService.TryClaim(v, (status, accepted) =>
+                UsernameService.TryClaim(desired, capturedSlot, (status, accepted) =>
                 {
                     field.text = accepted.Length > 0 ? accepted : fallback;
+                    bool applied = status is UsernameService.Status.Ok or UsernameService.Status.Offline;
+                    if (applied && isRename &&
+                        !string.Equals(accepted, current, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        PlayerProgress.SpendTokens(cost);
+                        PlayerProgress.BumpRenameCount(capturedSlot);
+                    }
+                    RefreshHint();
                     switch (status)
                     {
                         case UsernameService.Status.Ok:
-                            SetStatus("✓ name reserved", new Color(0.4f, 0.95f, 0.55f)); break;
+                            SetStatus(isRename ? $"✓ renamed — {cost} tokens spent" : "✓ name reserved",
+                                      new Color(0.4f, 0.95f, 0.55f)); break;
                         case UsernameService.Status.Taken:
                             SetStatus("That name is taken — try another.", new Color(1f, 0.5f, 0.4f)); break;
                         case UsernameService.Status.Offline:
-                            SetStatus("Saved — it'll be reserved once you're online.",
-                                      new Color(1f, 0.72f, 0.18f)); break;
+                            SetStatus(isRename
+                                ? $"Renamed — {cost} tokens spent. Reserves when you're online."
+                                : "Saved — it'll be reserved once you're online.",
+                                new Color(1f, 0.72f, 0.18f)); break;
                         case UsernameService.Status.Invalid:
                             SetStatus($"Name must be {UsernameService.MinLen}–{UsernameService.MaxLen} characters.",
                                       new Color(1f, 0.5f, 0.4f)); break;

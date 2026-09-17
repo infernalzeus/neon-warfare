@@ -101,6 +101,8 @@ namespace NW.App
                     ["mmr"]           = run.mmr,
                     ["result"]        = run.result,
                     ["durationTicks"] = run.durationTicks,
+                    ["scoreTicks"]    = run.scoreTicks,   // speed-normalised — the value `score` is built from
+                    ["speed"]         = run.speed,
                     ["recordedUtc"]   = run.recordedUtc,
                     ["score"]         = RankLadder.SortKey(run),
                     ["ghost"]         = json,
@@ -188,11 +190,12 @@ namespace NW.App
             d.TryGetValue("recordedUtc", out long rec);
             d.TryGetValue("mmr", out long mmr);
             d.TryGetValue("pilot", out string pilot);
+            double spd = d.TryGetValue("speed", out double sp) ? sp : 1.0;
             return new LeaderboardEntry
             {
                 rank = rank, pilot = string.IsNullOrEmpty(pilot) ? "PILOT" : pilot,
                 pilotId = d.Id, mmr = (int)mmr, won = result == 1,
-                durationTicks = (int)dur, recordedUtc = rec,
+                durationTicks = (int)dur, speed = (float)(spd <= 0 ? 1.0 : spd), recordedUtc = rec,
                 isYou = d.Id == mePilotId, ghostId = d.Id, isRemote = true,
             };
         }
@@ -202,7 +205,13 @@ namespace NW.App
             d.TryGetValue("result", out long result);
             d.TryGetValue("durationTicks", out long dur);
             d.TryGetValue("recordedUtc", out long rec);
-            return new GhostRecord { result = (int)result, durationTicks = (int)dur, recordedUtc = rec };
+            long score = d.TryGetValue("scoreTicks", out long st) ? st : 0L;
+            double spd = d.TryGetValue("speed", out double sp) ? sp : 1.0;
+            return new GhostRecord
+            {
+                result = (int)result, durationTicks = (int)dur, scoreTicks = (int)score,
+                speed = (float)(spd <= 0 ? 1.0 : spd), recordedUtc = rec,
+            };
         }
 
         List<LeaderboardEntry> Local(int level, int dailySeed, int limit)

@@ -11,7 +11,8 @@ namespace NW.App
 {
     /// <summary>
     /// Claims a globally-unique pilot name in Firestore (<c>usernames/{key}</c>) so no two players
-    /// share a leaderboard identity. The name itself lives in <see cref="PlayerProgress.PilotName"/>.
+    /// share a leaderboard identity. Names are per save slot — one device holds up to 3 — so every
+    /// call is scoped to a slot; the name itself is stored via <see cref="PlayerProgress.SetSlotName"/>.
     ///
     /// Degrades cleanly: without the Firebase backend (or while offline) a name is still set
     /// locally — just not reserved — and can be claimed on the next successful attempt while online.
@@ -22,7 +23,9 @@ namespace NW.App
 
         public const int MinLen = 3;
         public const int MaxLen = 16;
-        const string ClaimedKeyPref = "pp_username_key";
+        static string ClaimedKeyPref(int slot) => $"pp_s{slot}_username_key";
+
+        static string SlotName(int slot) => PlayerProgress.GetSlotPreview(slot).name;
 
         /// <summary>Trim, collapse internal whitespace, keep only letters / digits / _ / - / space.</summary>
         public static string Normalize(string raw)
@@ -46,53 +49,53 @@ namespace NW.App
 
         static string KeyOf(string display) => Normalize(display).ToLowerInvariant().Replace(' ', '_');
 
-        /// <summary>Attempt to make <paramref name="desired"/> this player's unique name. The
-        /// callback fires on the main thread with the outcome and the accepted display string
-        /// (unchanged from the current name on failure).</summary>
-        public static void TryClaim(string desired, Action<Status, string> done)
+        /// <summary>Attempt to make <paramref name="desired"/> the unique name of save slot
+        /// <paramref name="slot"/>. The callback fires on the main thread with the outcome and the
+        /// accepted display string (unchanged from the slot's current name on failure).</summary>
+        public static void TryClaim(string desired, int slot, Action<Status, string> done)
         {
             string display = Normalize(desired);
-            if (!IsValid(display)) { done?.Invoke(Status.Invalid, PlayerProgress.PilotName); return; }
+            if (!IsValid(display)) { done?.Invoke(Status.Invalid, SlotName(slot)); return; }
 
 #if NW_FIREBASE
-            if (Leaderboard.IsOnline) { ClaimRemote(display, done); return; }
+            if (Leaderboard.IsOnline) { ClaimRemote(display, slot, done); return; }
 #endif
-            PlayerProgress.PilotName = display;                 // local, unreserved
+            PlayerProgress.SetSlotName(slot, display);          // local, unreserved
             done?.Invoke(Status.Offline, display);
         }
 
 #if NW_FIREBASE
-        static void ClaimRemote(string display, Action<Status, string> done)
+        static void ClaimRemote(string display, int slot, Action<Status, string> done)
         {
             var db  = FirebaseFirestore.DefaultInstance;
             var usr = FirebaseAuth.DefaultInstance.CurrentUser;
             string uid = usr != null ? usr.UserId : "";
             string newKey = KeyOf(display);
-            string oldKey = PlayerPrefs.GetString(ClaimedKeyPref, "");
+            string oldKey = PlayerPrefs.GetString(ClaimedKeyPref(slot), "");
             var newRef = db.Collection("usernames").Document(newKey);
 
             newRef.GetSnapshotAsync().ContinueWithOnMainThread(t =>
             {
-                if (t.IsFaulted) { done?.Invoke(Status.Error, PlayerProgress.PilotName); return; }
+                if (t.IsFaulted) { done?.Invoke(Status.Error, SlotName(slot)); return; }
 
                 bool ownedByOther = t.Result.Exists
                     && (!t.Result.TryGetValue("uid", out string owner) || owner != uid);
-                if (ownedByOther) { done?.Invoke(Status.Taken, PlayerProgress.PilotName); return; }
+                if (ownedByOther) { done?.Invoke(Status.Taken, SlotName(slot)); return; }
 
                 var data = new Dictionary<string, object>
                 {
-                    ["pilotId"]   = PlayerProgress.PilotId,
+                    ["pilotId"]   = PlayerProgress.PilotIdForSlot(slot),
                     ["uid"]       = uid,
                     ["name"]      = display,
                     ["claimedAt"] = FieldValue.ServerTimestamp,
                 };
                 newRef.SetAsync(data).ContinueWithOnMainThread(w =>
                 {
-                    if (w.IsFaulted) { done?.Invoke(Status.Error, PlayerProgress.PilotName); return; }
+                    if (w.IsFaulted) { done?.Invoke(Status.Error, SlotName(slot)); return; }
                     if (!string.IsNullOrEmpty(oldKey) && oldKey != newKey)
                         db.Collection("usernames").Document(oldKey).DeleteAsync();   // release the old name
-                    PlayerProgress.PilotName = display;
-                    PlayerPrefs.SetString(ClaimedKeyPref, newKey);
+                    PlayerProgress.SetSlotName(slot, display);
+                    PlayerPrefs.SetString(ClaimedKeyPref(slot), newKey);
                     PlayerPrefs.Save();
                     done?.Invoke(Status.Ok, display);
                 });

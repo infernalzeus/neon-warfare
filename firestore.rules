@@ -15,21 +15,27 @@ service cloud.firestore {
         && request.auth.uid != null
         && request.resource.data.pilotId == pilotId
         && request.resource.data.keys().hasOnly(
-             ['pilot','pilotId','mmr','result','durationTicks','recordedUtc','score','ghost','updatedAt'])
+             ['pilot','pilotId','mmr','result','durationTicks','scoreTicks','speed',
+              'recordedUtc','score','ghost','updatedAt'])
         && request.resource.data.pilot is string
         && request.resource.data.pilot.size() <= 24
         && request.resource.data.result in [0, 1]
         && request.resource.data.durationTicks is int
         && request.resource.data.durationTicks >= 0
         && request.resource.data.durationTicks < 1000000000
+        && request.resource.data.scoreTicks is int
+        && request.resource.data.scoreTicks >= 0
+        && request.resource.data.scoreTicks < 1000000000
+        && request.resource.data.speed is number
         && request.resource.data.mmr is int
         && request.resource.data.ghost is string
         && request.resource.data.ghost.size() < 60000
+        // `score` must equal RankLadder.SortKey built from the SPEED-NORMALISED tick count.
         && request.resource.data.score ==
              (request.resource.data.result * 1000000000
               + (request.resource.data.result == 1
-                   ? 1000000000 - request.resource.data.durationTicks
-                   : request.resource.data.durationTicks));
+                   ? 1000000000 - request.resource.data.scoreTicks
+                   : request.resource.data.scoreTicks));
 
       allow delete: if false;
     }

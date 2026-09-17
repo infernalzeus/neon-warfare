@@ -182,6 +182,7 @@ namespace NW.Combat.Domain
                     Attack(i, u, targetIdx);
                     u.Cooldown = u.Spec.AttackCooldown;
                 }
+                Kite(i, u, targetIdx);
             }
 
             UpdatePylons();
@@ -206,6 +207,34 @@ namespace NW.Combat.Domain
             if (u.Lane < GroundLanes && LaneController(u.Lane) == (u.Team == Team.Player ? Owner.Player : Owner.Enemy))
                 s *= LaneSpeedBonus;
             return s;
+        }
+
+        // The interceptor -- the one skirmisher on the solo air lane, fast and fragile
+        // (Range 5, Speed 6) -- held its ground once a target entered range, same as a melee
+        // unit standing to swing, so a slower ground unit could walk right up to point-blank
+        // and trade it down instead of it kiting. Scoped to air units only: a ground-based
+        // ranged unit (sniper, turret) is meant to plant and unload, not back away, so this
+        // must not fire for them even though their Range also clears the threshold.
+        private const float KiteRangeThreshold = 4f;
+        private const float KiteHoldFraction = 0.6f;
+
+        private void Kite(int index, UnitState u, int targetIdx)
+        {
+            if (!u.Spec.IsAir || u.Spec.Range <= KiteRangeThreshold) return;
+            UnitState target = _units[targetIdx];
+            float dist = u.X > target.X ? u.X - target.X : target.X - u.X;
+            float holdDist = u.Spec.Range * KiteHoldFraction;
+            if (dist >= holdDist) return;
+
+            float awayDir = u.X >= target.X ? 1f : -1f;
+            float next = u.X + awayDir * EffectiveSpeed(u) * TickDelta;
+            // Bounded to stay outside BOTH cores' defense radius, not just the raw lane -- a
+            // kiter chased for long enough would otherwise walk itself onto a core icon (and,
+            // if the retreat direction ever ran the "wrong" way, into that core's damage zone)
+            // instead of just re-opening range from its attacker.
+            if (next < CoreDefenseRange) next = CoreDefenseRange;
+            if (next > LaneLength - CoreDefenseRange) next = LaneLength - CoreDefenseRange;
+            u.X = next;
         }
 
         private void MarchOrSiege(int index, UnitState u)

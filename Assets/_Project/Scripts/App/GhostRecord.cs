@@ -50,7 +50,12 @@ namespace NW.App
         public int    gemCount  = 5;
         public float  difficulty = 1f;
         public int    result    = 0;      // 1 = recording pilot won, 0 = lost
-        public int    durationTicks = 0;
+        public int    durationTicks = 0;  // raw sim ticks the match ran — honest wall-of-fame time
+        public int    scoreTicks    = 0;  // durationTicks / speed — what the board actually ranks on.
+                                          // 0 on legacy/bundled ghosts → RankLadder falls back to durationTicks.
+        public float  speed         = 1f; // BattleSpeed the match was played at (0.5 / 1 / 1.5).
+                                          // A faster clear ranks higher: 1.5x is harder (less reaction time,
+                                          // same sim) so it earns a proportional edge on the ladder.
         public long   recordedUtc = 0;    // DateTime.UtcNow.ToBinary()
         public bool   bundled   = false;  // shipped with the build (read-only pool)
         public List<GhostAction> actions = new List<GhostAction>();

@@ -112,6 +112,14 @@ namespace NW.App
             public RawImage[]    Limbs;
             public bool          Rigged;
             public bool          RigOn;       // rig visible right now (walking), vs baked pose
+            // Multi-leg rig (stinger, crawler, hive): same idea as Limbs, generalized to N legs.
+            // Segment count varies per unit (NeonArt.MultiLegSegCount), so this is sized on spawn.
+            public RawImage[]    MultiLegs;
+            public bool          MultiLegRigged;
+            public bool          MultiLegRigOn;
+            public RawImage[]    Rotors;
+            public bool          RotorRigged;
+            public bool          RotorsOn;
             public bool          PendingDeployFx;  // spawn flourish owed, fired once placed
             public Image[]       SkinFx;           // VFX-skin elements, beside the unit
             public float         SkinFxPhase;
@@ -136,12 +144,18 @@ namespace NW.App
             public float         VelX;       // SmoothDamp velocity — accel/brake motion profile
             // Per-troop attack animation state
             public string        SpecId;     // cached from UnitSpec.Id for quick dispatch
+            public bool          IsStationary; // cached from UnitSpec.Speed <= 0 (e.g. turret) —
+                                                // single source of truth for "this unit never moves",
+                                                // replacing hardcoded SpecId=="turret" string checks
             public string        ArtId;      // themed art id — pose/part lookups
             public float         UScale = 1f; // rect size / 52 baseline — scales VFX offsets,
                                               // lunges and hops so motion keeps its proportion
                                               // to the body at any unit size
             public int           PoseFrame;  // current walk-cycle frame (0 neutral, 1 stride, 2 pass)
             public int           AttackPose = -1; // >=0 overrides the walk frame (3 windup, 4 strike)
+            public float         AttackPoseTime; // Time.time when AttackPose last changed -- drives
+                                                  // DriveAttackSwing's windup/strike ease, independent
+                                                  // of whichever coroutine's own choreography timing set it
         }
 
         readonly Dictionary<ulong, UnitView> _views      = new();
@@ -593,7 +607,7 @@ namespace NW.App
                                             atkV.Rt.anchoredPosition, defV.Rt.anchoredPosition,
                                             _laneRects[li], pc, pSize));
                                     }
-                                    StartCoroutine(DelayedDefenderReaction(defV, atkV, 0.13f, e.Flag, midpoint: false));
+                                    StartCoroutine(DelayedDefenderReaction(defV, atkV, 0.13f, e.Flag, midpoint: false, ranged: true));
                                 }
                                 StartCoroutine(TroopAttackAnim(atkV, ranged: true));
                             }
@@ -912,7 +926,7 @@ namespace NW.App
                 {
                     v.BobPhase += Time.deltaTime * 4.0f;
                 }
-                else if (v.SpecId != "turret")
+                else if (!v.IsStationary)
                 {
                     // Stride lengths are tuned for READABILITY, not physical scale. The titan is the
                     // slowest unit (Speed 1.5) and had the longest stride (26), which worked out to
@@ -945,7 +959,13 @@ namespace NW.App
                     // Rotor blur. Air units never ran the pose swapper, so a quadrotor slid
                     // through the sky with frozen blades. Cycle its frames on a fast clock
                     // that is independent of the hover bob.
-                    if (NeonArt.HasPoses(v.ArtId) && v.AttackPose < 0)
+                    // A unit with a real rotor rig (Probe) skips this entirely -- this block
+                    // and the rig block below it were both setting v.Body.texture and
+                    // v.PoseFrame every frame, fighting each other for which one "won" on any
+                    // given frame. That's the actual cause of "still beating its wings, fins
+                    // not visible": the two systems were flickering the texture back and
+                    // forth, never settling on the rig's own body-without-blades texture.
+                    if (NeonArt.HasPoses(v.ArtId) && v.AttackPose < 0 && !v.RotorRigged)
                     {
                         // 26Hz was authored for a quadrotor whose two frames differ only by a
                         // rotor smear -- at that rate it reads as blur. The authored flyers
@@ -965,7 +985,7 @@ namespace NW.App
                         }
                     }
                 }
-                else if (v.SpecId == "turret")
+                else if (v.IsStationary)
                 {
                     bob = 0f;
                 }
@@ -1018,23 +1038,59 @@ namespace NW.App
                         // walking, and falls back to the baked frames for idle, windup, strike
                         // and flinch -- those poses are authored per unit and read better hand
                         // placed than interpolated.
-                        bool wantRig = v.Rigged && v.AttackPose < 0 && walkW > 0.4f;
+                        // Hysteresis, not a single 0.4 cutoff: a unit whose walkW sits right at
+                        // that line (Obelisk's slow, heavy gait does) flipped the rig on and off
+                        // every few frames -- each flip swaps the live, separately-tinted arm
+                        // layer for the baked pose's built-in arm and back, which read as the
+                        // shoulder's colour flickering rather than a rig toggle. Once on, stay on
+                        // until walkW drops further; once off, climb higher to restart.
+                        // Windup (3) and strike (4) ALSO keep the rig on now instead of falling
+                        // back to the baked pose -- see DriveAttackSwing. Every rigged builder's
+                        // weapon prop was already baked assuming "the live rig supplies the
+                        // swing" (that comment sits on a dozen of them); this is what finally
+                        // makes it true instead of silently reverting to the frozen bake.
+                        // Flinch (5) is left on the old baked path -- it is a body recoil, not
+                        // a weapon action, and the rig has no flinch pose of its own.
+                        bool attacking = v.AttackPose == 3 || v.AttackPose == 4;
+                        bool wantRig = v.Rigged && (attacking || (v.AttackPose < 0 && (v.RigOn ? walkW > 0.3f : walkW > 0.45f)));
                         if (v.Rigged) DriveLimbRig(v, wantRig, walkW);
+                        // Rotors spin continuously regardless of walk/idle/attack -- the blades
+                        // don't stop just because the drone isn't currently marching.
+                        if (v.RotorRigged) DriveRotors(v);
 
+                        // Multi-leg rig (stinger, crawler, hive): walk-only, same hysteresis as
+                        // the 2-leg rig. Windup/strike/flinch stay on the baked path for these --
+                        // they're the sniper/mech/titan roles, whose attacks are a recoil/lean,
+                        // not a limb swing a leg rig has any business driving.
+                        bool wantMultiLegRig = v.MultiLegRigged && v.AttackPose < 0
+                            && (v.MultiLegRigOn ? walkW > 0.3f : walkW > 0.45f);
+                        if (v.MultiLegRigged) DriveMultiLegRig(v, wantMultiLegRig, walkW);
+
+                        // Strider deliberately has no walk pose at all: it holds its idle frame
+                        // while it moves and rides on the existing bob/squash/dust cues instead
+                        // -- explicit direction, after both the rig and the old 4-pose leg swap
+                        // read wrong on this unit's silhouette. Everything else about movement
+                        // (position, bob, tilt, stomp dust) is untouched; only the leg pose is
+                        // pinned.
+                        bool noWalkPose = v.SpecId == "mech";
                         int frame = v.AttackPose >= 0
                             ? v.AttackPose
-                            : (walkW > 0.4f
+                            : (walkW > 0.4f && !noWalkPose
                                ? Walk4[(int)(v.BobPhase / (Mathf.PI * 0.5f)) & 3]
                                : 0);
-                        if (wantRig) frame = -1;          // body-only texture, limbs are live
+                        if (wantRig || wantMultiLegRig || v.RotorRigged) frame = -1;   // body-only texture, moving layer is live
                         if (frame != v.PoseFrame)
                         {
                             v.PoseFrame = frame;
-                            v.Body.texture = frame < 0
-                                ? NeonArt.UnitNoLimbs(v.ArtId, v.IsPlayer)
-                                : (NeonArt.HasWeaponPart(v.ArtId)
+                            v.Body.texture = frame >= 0
+                                ? (NeonArt.HasWeaponPart(v.ArtId)
                                     ? NeonArt.UnitBody(v.ArtId, v.IsPlayer, frame)
-                                    : NeonArt.Unit(v.ArtId, v.IsPlayer, frame));
+                                    : NeonArt.Unit(v.ArtId, v.IsPlayer, frame))
+                                : (v.RotorRigged
+                                    ? NeonArt.UnitNoRotor(v.ArtId, v.IsPlayer)
+                                    : (v.MultiLegRigged
+                                        ? NeonArt.UnitNoMultiLegs(v.ArtId, v.IsPlayer)
+                                        : NeonArt.UnitNoLimbs(v.ArtId, v.IsPlayer)));
                         }
                     }
                 }
@@ -1082,7 +1138,7 @@ namespace NW.App
                 // Idle rotation life + smooth auto-uprighting after attack leans
                 if (!v.Dying && !v.Lunging)
                 {
-                    if (v.SpecId == "turret")
+                    if (v.IsStationary)
                     {
                         // Barrels sweep on the weapon layer; the base never rotates
                         var scanRt = v.Weapon != null && v.Weapon.enabled ? v.Weapon.rectTransform : v.Rt;
@@ -1177,6 +1233,18 @@ namespace NW.App
                 {
                     v.Body.color = dmgCol;
                     if (v.Weapon.enabled) v.Weapon.color = dmgCol;
+                    // Rigged units' limb layers used to keep their old tint while the body
+                    // darkened under it, so a unit taking damage mid-stride visibly split
+                    // into two different colours -- the "flashing, something happening" look.
+                    if (v.RigOn && v.Limbs != null)
+                        for (int li = 0; li < v.Limbs.Length; li++)
+                            if (v.Limbs[li]) v.Limbs[li].color = dmgCol;
+                    if (v.MultiLegRigOn && v.MultiLegs != null)
+                        for (int li = 0; li < v.MultiLegs.Length; li++)
+                            if (v.MultiLegs[li]) v.MultiLegs[li].color = dmgCol;
+                    if (v.RotorsOn && v.Rotors != null)
+                        for (int si = 0; si < v.Rotors.Length; si++)
+                            if (v.Rotors[si]) v.Rotors[si].color = dmgCol;
                 }
 
                 if (v.ActiveSkin > 0) AnimateSkinVfx(v);
@@ -1562,6 +1630,92 @@ namespace NW.App
                     if (v.Limbs[li]) v.Limbs[li].enabled = false;
             }
             v.RigOn = false;
+
+            // ── multi-leg rig (stinger, crawler, hive) ──────────────────────────
+            // Same idea as the limb rig above, generalized to N legs. No parenting between
+            // segments -- each leg-group is one rigid piece rotating from its own hip, unlike
+            // the 2-leg rig's thigh/shin composition.
+            v.MultiLegRigged = NeonArt.HasMultiLegRig(artId);
+            if (v.MultiLegRigged)
+            {
+                int n = NeonArt.MultiLegSegCount(artId);
+                if (v.MultiLegs == null || v.MultiLegs.Length != n) v.MultiLegs = new RawImage[n];
+                for (int li = 0; li < n; li++)
+                {
+                    Vector2 joint = NeonArt.MultiLegHip01(artId, li);
+                    if (v.MultiLegs[li] == null)
+                    {
+                        var lgo = new GameObject("mleg" + li);
+                        lgo.transform.SetParent(v.Rt, false);
+                        var lr = lgo.AddComponent<RectTransform>();
+                        lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
+                        v.MultiLegs[li] = lgo.AddComponent<RawImage>();
+                        v.MultiLegs[li].raycastTarget = false;
+                    }
+                    var img = v.MultiLegs[li];
+                    var rt2 = img.rectTransform;
+                    rt2.SetParent(v.Rt, false);
+                    rt2.sizeDelta = v.Rt.sizeDelta;
+                    rt2.pivot     = joint;
+                    rt2.anchorMin = rt2.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt2.anchoredPosition = new Vector2((joint.x - 0.5f) * v.Rt.sizeDelta.x,
+                                                        (joint.y - 0.5f) * v.Rt.sizeDelta.y);
+                    rt2.localRotation = Quaternion.identity;
+                    img.texture = NeonArt.UnitMultiLeg(artId, isPlayer, li);
+                    img.uvRect  = uv;
+                    img.color   = v.Body.color;
+                    img.enabled = false;                 // off until the unit actually walks
+                    rt2.SetSiblingIndex(0);              // legs draw behind the body
+                }
+            }
+            else if (v.MultiLegs != null)
+            {
+                for (int li = 0; li < v.MultiLegs.Length; li++)
+                    if (v.MultiLegs[li]) v.MultiLegs[li].enabled = false;
+            }
+            v.MultiLegRigOn = false;
+
+            // ── rotor rig (Probe) ───────────────────────────────────────────────
+            // Same split as the limb rig above: a body layer with the blades omitted, plus a
+            // separately-baked layer per hub that this view spins continuously every frame
+            // instead of flipping between a couple of fixed blade-angle poses.
+            v.RotorRigged = NeonArt.HasRotorRig(artId);
+            if (v.RotorRigged)
+            {
+                if (v.Rotors == null) v.Rotors = new RawImage[2];
+                for (int side = 0; side < 2; side++)
+                {
+                    if (v.Rotors[side] == null)
+                    {
+                        var rgo = new GameObject("rotor" + side);
+                        rgo.transform.SetParent(v.Rt, false);
+                        var rr = rgo.AddComponent<RectTransform>();
+                        rr.anchorMin = rr.anchorMax = new Vector2(0.5f, 0.5f);
+                        v.Rotors[side] = rgo.AddComponent<RawImage>();
+                        v.Rotors[side].raycastTarget = false;
+                    }
+                    var rimg = v.Rotors[side];
+                    var rrt  = rimg.rectTransform;
+                    rrt.sizeDelta = v.Rt.sizeDelta;
+                    Vector2 hub = NeonArt.RotorHub01(side);
+                    rrt.pivot = hub;
+                    rrt.anchoredPosition = new Vector2((hub.x - 0.5f) * v.Rt.sizeDelta.x,
+                                                        (hub.y - 0.5f) * v.Rt.sizeDelta.y);
+                    rrt.localRotation = Quaternion.identity;
+                    rimg.texture = NeonArt.UnitRotor(artId, isPlayer, side);
+                    rimg.uvRect  = uv;
+                    rimg.color   = v.Body.color;
+                    rimg.enabled = true;               // always spinning, not gated on walking
+                }
+                v.RotorsOn = true;
+            }
+            else if (v.Rotors != null)
+            {
+                for (int side = 0; side < 2; side++)
+                    if (v.Rotors[side]) v.Rotors[side].enabled = false;
+                v.RotorsOn = false;
+            }
+
             v.Weapon.rectTransform.anchoredPosition = Vector2.zero;
             v.Weapon.rectTransform.localRotation    = Quaternion.identity;
             v.ArtId     = artId;
@@ -1624,6 +1778,7 @@ namespace NW.App
             };
             v.Glow.color    = new Color(1f, 1f, 1f, glowAlpha);
             v.SpecId        = u.Spec.Id;
+            v.IsStationary  = u.Spec.Speed <= 0f;
             v.Anim          = UAnim.March;
             v.BobW          = 1f;
             v.PrevHop       = 0f;
@@ -1670,6 +1825,7 @@ namespace NW.App
             if (!NeonArt.HasAttackPoses(v.ArtId)) return;
             if (v.AttackPose == pose) return;
             v.AttackPose = pose;
+            v.AttackPoseTime = Time.time;
             int f = pose >= 0 ? pose : v.PoseFrame;
             v.Body.texture = NeonArt.HasWeaponPart(v.ArtId)
                 ? NeonArt.UnitBody(v.ArtId, v.IsPlayer, f)
@@ -1730,8 +1886,15 @@ namespace NW.App
                 v.RigOn = true;
             }
 
-            float t    = v.BobPhase / (Mathf.PI * 2f);
             float mirr = v.IsPlayer ? 1f : -1f;    // enemies march the other way
+
+            if (v.AttackPose == 3 || v.AttackPose == 4)
+            {
+                DriveAttackSwing(v, mirr);
+                return;
+            }
+
+            float t    = v.BobPhase / (Mathf.PI * 2f);
             float w    = Mathf.Clamp01(walkW);
 
             // COS, not sin, so the legs are at full spread when BobPhase is a multiple of PI --
@@ -1739,26 +1902,122 @@ namespace NW.App
             // means the hips are closer to the ground; feet together means the body rides up. Using
             // sin here put the bounce exactly out of phase with the stride, so the unit rose as its
             // legs spread, which reads as floating.
+            // Stride amplitude is per-unit (NeonArt.RigSwingDeg) -- a squat, wide-set walker
+            // like Strider or a giant like Atlas doesn't take the same size stride Lancer does.
+            NeonArt.RigSwingDeg(v.ArtId, out float hipDeg, out float kneeDeg, out float armDeg);
             float a     = t * Mathf.PI * 2f;
-            float hipN  =  Mathf.Cos(a) * 29f * w;
-            float hipF  = -Mathf.Cos(a) * 29f * w;
+            float hipN  =  Mathf.Cos(a) * hipDeg * w;
+            float hipF  = -Mathf.Cos(a) * hipDeg * w;
             // the knee only folds while that leg is swinging FORWARD through the pass
-            float kneeN = Mathf.Max(0f, -Mathf.Sin(a)) * 44f * w;
-            float kneeF = Mathf.Max(0f,  Mathf.Sin(a)) * 44f * w;
-            // arms hang and counter-swing their own side's leg. Never raised above the shoulder:
-            // the segment is baked pointing straight down and swings at most 24 degrees either way.
-            float armN  = -Mathf.Cos(a) * 24f * w;
-            float armF  =  Mathf.Cos(a) * 24f * w;
+            float kneeN = Mathf.Max(0f, -Mathf.Sin(a)) * kneeDeg * w;
+            float kneeF = Mathf.Max(0f,  Mathf.Sin(a)) * kneeDeg * w;
+            // arms hang and counter-swing their own side's leg. Never raised above the shoulder.
+            float armN  = -Mathf.Cos(a) * armDeg * w;
+            float armF  =  Mathf.Cos(a) * armDeg * w;
 
-            Set(0, hipF); Set(1, -kneeF); Set(2, hipN); Set(3, -kneeN); Set(4, armF); Set(5, armN);
+            SetLimb(v, 0, hipF, mirr); SetLimb(v, 1, -kneeF, mirr);
+            SetLimb(v, 2, hipN, mirr); SetLimb(v, 3, -kneeN, mirr);
+            SetLimb(v, 4, armF, mirr); SetLimb(v, 5, armN, mirr);
+        }
 
-            void Set(int i, float deg)
+        // +deg swings the limb forward: (0,-1) rotated CCW by +deg -> (sin, -cos), i.e. +x
+        static void SetLimb(UnitView v, int i, float deg, float mirr)
+        {
+            var img = v.Limbs[i];
+            if (img == null) return;
+            img.rectTransform.localRotation = Quaternion.Euler(0f, 0f, deg * mirr);
+        }
+
+        /// <summary>Drives the near arm (index 5 -- the segment every rigged builder bakes its
+        /// weapon prop onto) through an actual windup-then-strike swing, continuously, instead
+        /// of the old behaviour: freeze the rig and pop the whole body to a baked "arm crossed
+        /// to the chest" texture. Every rigged weapon prop already has a comment saying "the
+        /// live rig supplies the swing" -- this is that promise, finally kept. Legs hold a
+        /// shallow static brace (no oscillation -- an attack isn't a stride) so the unit doesn't
+        /// look like it's still walking mid-swing.</summary>
+        void DriveAttackSwing(UnitView v, float mirr)
+        {
+            NeonArt.RigSwingDeg(v.ArtId, out float hipDeg, out _, out float armDeg);
+            float elapsed = Mathf.Max(0f, Time.time - v.AttackPoseTime);
+            const float SwingDur = 0.09f;
+            float e = Mathf.Clamp01(elapsed / SwingDur);
+            e = 1f - (1f - e) * (1f - e);   // ease-out
+
+            float brace = Mathf.Min(hipDeg * 0.5f, 8f) * e;
+            SetLimb(v, 0, -brace, mirr); SetLimb(v, 1, 0f, mirr);
+            SetLimb(v, 2,  brace, mirr); SetLimb(v, 3, 0f, mirr);
+
+            // Windup winds the weapon arm back; strike drives it through a wide arc past
+            // neutral. The strike lerp starts from the windup's own end angle so the swing
+            // reads as one continuous motion across the pose-3-to-4 handoff, not two snaps.
+            float cap = Mathf.Max(armDeg, 16f);
+            float armSwing = v.AttackPose == 4
+                ? Mathf.Lerp(-cap * 1.8f, cap * 2.2f, e)
+                : Mathf.Lerp(0f, -cap * 1.8f, e);
+            SetLimb(v, 4, -armSwing * 0.22f, mirr);   // far arm: a subtler counter-brace
+            SetLimb(v, 5,  armSwing, mirr);           // near arm: carries the weapon prop
+        }
+
+        /// <summary>Rotates each leg-group segment from a continuous walk phase, the same idea
+        /// as DriveLimbRig generalized to N legs. Per-segment phase offsets reproduce exactly
+        /// the alternation the old baked sweep already established for that unit (Stinger:
+        /// front/back opposite; Hive: diagonal pairs in phase, a real trot; Crawler: a ripple
+        /// across the row, front leg leading) -- just evaluated every frame instead of four
+        /// times a stride, so a leg travels rather than snapping.</summary>
+        void DriveMultiLegRig(UnitView v, bool on, float walkW)
+        {
+            if (v.MultiLegs == null) return;
+
+            if (!on)
             {
-                var img = v.Limbs[i];
-                if (img == null) return;
-                // +deg swings the limb forward: (0,-1) rotated CCW by +deg -> (sin, -cos), i.e. +x
+                if (v.MultiLegRigOn)
+                {
+                    for (int i = 0; i < v.MultiLegs.Length; i++)
+                        if (v.MultiLegs[i]) v.MultiLegs[i].enabled = false;
+                    v.MultiLegRigOn = false;
+                }
+                return;
+            }
+
+            if (!v.MultiLegRigOn)
+            {
+                for (int i = 0; i < v.MultiLegs.Length; i++)
+                    if (v.MultiLegs[i]) { v.MultiLegs[i].enabled = true; v.MultiLegs[i].color = v.Body.color; }
+                v.MultiLegRigOn = true;
+            }
+
+            float a    = v.BobPhase;
+            float mirr = v.IsPlayer ? 1f : -1f;
+            float w    = Mathf.Clamp01(walkW);
+            const float amp = 13f;
+
+            float[] offsets = v.ArtId switch
+            {
+                "stinger" => new[] { 0f, Mathf.PI },                         // front / back, opposite
+                "hive"    => new[] { 0f, Mathf.PI, 0f, Mathf.PI },           // diagonal trot: seg0+2 in phase, seg1+3 opposite
+                "crawler" => new[] { 0f, 0.75f, 1.5f },                      // tripod ripple, front leads
+                _         => null,
+            };
+            if (offsets == null) return;
+
+            for (int i = 0; i < v.MultiLegs.Length && i < offsets.Length; i++)
+            {
+                var img = v.MultiLegs[i];
+                if (img == null) continue;
+                float deg = Mathf.Cos(a + offsets[i]) * amp * w;
                 img.rectTransform.localRotation = Quaternion.Euler(0f, 0f, deg * mirr);
             }
+        }
+
+        /// <summary>Spins a rotor-rigged unit's blade layers continuously -- always on, not
+        /// gated to the walk phase the way the leg rig is, since a drone's blades don't stop
+        /// when it isn't marching.</summary>
+        void DriveRotors(UnitView v)
+        {
+            if (v.Rotors == null) return;
+            float deg = Time.time * 900f;
+            for (int side = 0; side < 2; side++)
+                if (v.Rotors[side]) v.Rotors[side].rectTransform.localRotation = Quaternion.Euler(0f, 0f, deg);
         }
 
         /// <summary>One-shot flourish at the moment a troop is committed to a lane.
@@ -1912,11 +2171,35 @@ namespace NW.App
                     float ph = Mathf.Clamp01(k * 1.9f - i * 0.1f);
                     if (ims[i]) ims[i].color = new Color(c.r, c.g, c.b, 1f - ph);
                 }
-                if (v.Body) v.Body.color = new Color(v.Body.color.r, v.Body.color.g, v.Body.color.b,
-                                                     Mathf.Lerp(0.2f, 1f, k));
+                if (v.Body)
+                {
+                    v.Body.color = new Color(v.Body.color.r, v.Body.color.g, v.Body.color.b,
+                                             Mathf.Lerp(0.2f, 1f, k));
+                    if (v.RigOn && v.Limbs != null)
+                        for (int li = 0; li < v.Limbs.Length; li++)
+                            if (v.Limbs[li]) v.Limbs[li].color = v.Body.color;
+                    if (v.MultiLegRigOn && v.MultiLegs != null)
+                        for (int li = 0; li < v.MultiLegs.Length; li++)
+                            if (v.MultiLegs[li]) v.MultiLegs[li].color = v.Body.color;
+                    if (v.RotorsOn && v.Rotors != null)
+                        for (int si = 0; si < v.Rotors.Length; si++)
+                            if (v.Rotors[si]) v.Rotors[si].color = v.Body.color;
+                }
                 yield return null;
             }
-            if (v.Body) v.Body.color = new Color(v.Body.color.r, v.Body.color.g, v.Body.color.b, 1f);
+            if (v.Body)
+            {
+                v.Body.color = new Color(v.Body.color.r, v.Body.color.g, v.Body.color.b, 1f);
+                if (v.RigOn && v.Limbs != null)
+                    for (int li = 0; li < v.Limbs.Length; li++)
+                        if (v.Limbs[li]) v.Limbs[li].color = v.Body.color;
+                if (v.MultiLegRigOn && v.MultiLegs != null)
+                    for (int li = 0; li < v.MultiLegs.Length; li++)
+                        if (v.MultiLegs[li]) v.MultiLegs[li].color = v.Body.color;
+                if (v.RotorsOn && v.Rotors != null)
+                    for (int si = 0; si < v.Rotors.Length; si++)
+                        if (v.Rotors[si]) v.Rotors[si].color = v.Body.color;
+            }
             for (int i = 0; i < LINES; i++) if (rts[i]) Destroy(rts[i].gameObject);
         }
 
@@ -2232,7 +2515,7 @@ namespace NW.App
         // ── synced hit reaction (P1: 1-on-1 coordination) ───────────────────────
         // The defender's flinch, knockback and spark, fired together on the attacker's
         // CONTACT frame. Melee routes here after ~windup+drive; ranged after the shot lands.
-        void DoDefenderReaction(UnitView def, UnitView atk, bool counter, bool midpoint)
+        void DoDefenderReaction(UnitView def, UnitView atk, bool counter, bool midpoint, bool ranged = false)
         {
             if (Time.time - _lastUnitHitTime >= 0.08f)
             {
@@ -2244,14 +2527,17 @@ namespace NW.App
             if (midpoint && atk != null && atk.Rt != null && atk.Rt.parent == def.Rt.parent)
                 at = (atk.Rt.anchoredPosition + def.Rt.anchoredPosition) * 0.5f;
             StartCoroutine(HitFlashCoroutine(def));
-            StartCoroutine(KnockBack(def, atk, counter ? 5f : 3.5f));
+            // Counter-hits (class-triangle bonus) and melee keep the full shove; a ranged shot
+            // landing shouldn't physically knock its target around the way a melee slam does.
+            float amt = counter ? 5f : ranged ? 1.5f : 3.5f;
+            StartCoroutine(KnockBack(def, atk, amt));
             StartCoroutine(SparkBurst(def, at));
         }
 
-        IEnumerator DelayedDefenderReaction(UnitView def, UnitView atk, float delay, bool counter, bool midpoint)
+        IEnumerator DelayedDefenderReaction(UnitView def, UnitView atk, float delay, bool counter, bool midpoint, bool ranged = false)
         {
             yield return new WaitForSeconds(delay);
-            DoDefenderReaction(def, atk, counter, midpoint);
+            DoDefenderReaction(def, atk, counter, midpoint, ranged);
         }
 
         // Victim shoved directly AWAY from the attacker on contact — an instant push that
@@ -2259,6 +2545,11 @@ namespace NW.App
         IEnumerator KnockBack(UnitView v, UnitView from, float amt)
         {
             if (v == null || v.Rt == null || v.Lunging || v.Dying) yield break;
+            // A stationary unit (turret) never physically moves — its own attack animation
+            // deliberately keeps its base fixed, so a hit reaction shouldn't shove it sideways
+            // either. HitFlash + SparkBurst (fired alongside this from DoDefenderReaction)
+            // still register that the hit landed.
+            if (v.IsStationary) yield break;
             v.Anim = UAnim.Stagger;
             // Taking damage is its own action, not just a shove: the body braces back onto the
             // rear foot with both arms thrown up. Held through the knockback, then released.
@@ -3099,6 +3390,8 @@ namespace NW.App
             float bank  = dir * -22f; // roll angle degrees
             float sweep = dir * 30f;  // strafing LungeOffset distance
             const float DUR = 0.28f;
+            Color flashCol = v.IsPlayer ? PlayerSolid : EnemySolid;
+            bool fired = false;
             for (float t = 0f; t < DUR; t += Time.deltaTime)
             {
                 if (v.Dying || v.Rt == null) yield break;
@@ -3106,6 +3399,14 @@ namespace NW.App
                 float s = Mathf.Sin(p * Mathf.PI);
                 v.Rt.localRotation = Quaternion.Euler(0f, 0f, bank * s);
                 v.LungeOffset      = sweep * s;
+                // Wing-mounted flash at the pass's midpoint — the strafe used to move the unit
+                // and authored no shot of its own, so a fly-by with no visible impact was possible.
+                if (!fired && p >= 0.5f)
+                {
+                    fired = true;
+                    StartCoroutine(AnimMuzzleFlash(v, new Vector2(dir * 18f, -2f), 11f,
+                        new Color(flashCol.r, flashCol.g, flashCol.b, 0.85f), 0.12f, gun: true));
+                }
                 yield return null;
             }
             if (!v.Dying && v.Rt != null)
@@ -3116,13 +3417,17 @@ namespace NW.App
             v.Lunging = false;
         }
 
-        // Hacker: tendrils pulse — VfxA brightens (scale swell) and fades
+        // Hacker: tendrils lash outward — VfxA travels from the hacker toward the target while
+        // it brightens (scale swell) and fades, instead of pulsing in place at anchoredPosition
+        // zero, which never visually reached anything.
         IEnumerator AnimHackerTendrils(UnitView v)
         {
             if (v.Lunging || v.AttackFlash == null) yield break;
             v.Lunging = true;
             // Scale-pulse the whole unit briefly (tendrils extending outward)
             const float DUR = 0.30f;
+            const float REACH = 40f; // short/medium melee-style reach, not a full-lane laser
+            float dir = v.IsPlayer ? 1f : -1f;
             Color tendCol = v.IsPlayer ? PlayerSolid : EnemySolid;
             for (float t = 0f; t < DUR; t += Time.deltaTime)
             {
@@ -3130,11 +3435,12 @@ namespace NW.App
                 float p = t / DUR;
                 float pulse = 1f + 0.22f * Mathf.Sin(p * Mathf.PI);
                 v.Rt.localScale = new Vector3(pulse, pulse, 1f);
-                // Flash at tendril tips (positioned outward)
+                // Flash travels outward toward the target as it pulses
                 if (v.AttackFlash != null)
                 {
-                    v.AttackFlash.rectTransform.anchoredPosition = Vector2.zero;
-                    v.AttackFlash.rectTransform.sizeDelta = new Vector2(pulse * 28f, pulse * 28f) * v.UScale;
+                    float reach = EaseOut(p);
+                    v.AttackFlash.rectTransform.anchoredPosition = new Vector2(dir * REACH * reach, 0f) * v.UScale;
+                    v.AttackFlash.rectTransform.sizeDelta = new Vector2(pulse * 24f, pulse * 24f) * v.UScale;
                     v.AttackFlash.color = new Color(tendCol.r, tendCol.g, tendCol.b, 0.55f * Mathf.Sin(p * Mathf.PI));
                 }
                 yield return null;
@@ -3360,6 +3666,17 @@ namespace NW.App
                 v.Rt.localRotation = Quaternion.Euler(0f, 0f, tiltDir * 10f * (1f - alpha));
                 if (v.Body)     v.Body.color     = new Color(1f, 1f, 1f, alpha);
                 if (v.Glow)     v.Glow.color     = new Color(1f, 1f, 1f, alpha * 0.55f);
+                // A rigged unit dying mid-stride used to fade the body while its limb layers
+                // stayed fully opaque, leaving disembodied arms and legs hanging in place.
+                if (v.RigOn && v.Limbs != null)
+                    for (int li = 0; li < v.Limbs.Length; li++)
+                        if (v.Limbs[li]) v.Limbs[li].color = new Color(1f, 1f, 1f, alpha);
+                if (v.MultiLegRigOn && v.MultiLegs != null)
+                    for (int li = 0; li < v.MultiLegs.Length; li++)
+                        if (v.MultiLegs[li]) v.MultiLegs[li].color = new Color(1f, 1f, 1f, alpha);
+                if (v.RotorsOn && v.Rotors != null)
+                    for (int si = 0; si < v.Rotors.Length; si++)
+                        if (v.Rotors[si]) v.Rotors[si].color = new Color(1f, 1f, 1f, alpha);
                 yield return null;
             }
 

@@ -8,7 +8,7 @@ namespace NW.App
     /// Procedural audio — generates AudioClips from PCM math, no asset imports needed.
     /// Clips are cached after first creation. Call AudioManager.Play(Sfx.X) anywhere.
     /// </summary>
-    public static class AudioManager
+    public static partial class AudioManager
     {
         public enum Sfx
         {
@@ -36,9 +36,15 @@ namespace NW.App
             Equip,         // solid clunk: cosmetic equipped
             UnitChirp,     // rising two-note robot voice: spawn / kill (pitch = class register)
             UnitDistress,  // falling two-note beep: critically damaged
+            LightningCrack,// noise thunder — crack + chest + deep sub bed + faint crackle: Zeus Engine intro
         }
 
         const int SR = 22050;
+
+        // One-line toggle for the humanization pass (timing jitter + velocity variation)
+        // added to the reworked themes' bass/lead/counter/stab notes. Themes 3 and 5 are
+        // never humanized regardless of this flag — see BuildMusic.
+        const bool kHumanize = true;
 
         static AudioSource _src;
         static AudioSource _music;
@@ -121,6 +127,22 @@ namespace NW.App
                 _music.loop         = true;
                 _music.playOnAwake  = false;
                 _music.spatialBlend = 0f;
+
+                // Gentle space + warmth — the synthesized layers are otherwise 100% dry,
+                // which reads as harsh/chiptune-y. Conservative settings so drum transients
+                // stay tight and don't wash out.
+                var reverb = go.AddComponent<AudioReverbFilter>();
+                reverb.reverbPreset     = AudioReverbPreset.User;
+                reverb.dryLevel         = 0f;
+                reverb.room             = -1000;
+                reverb.roomHF           = -1500;
+                reverb.decayTime        = 1.4f;
+                reverb.reflectionsLevel = -2000;
+                reverb.reverbLevel      = -1200;
+
+                var lowpass = go.AddComponent<AudioLowPassFilter>();
+                lowpass.cutoffFrequency = 10000f;
+
                 return _music;
             }
         }
@@ -296,6 +318,20 @@ namespace NW.App
             Sfx.UnitDistress  => Make(Mix(
                                      Osc(540f, 0.06f, 18f, 0.28f, harm2: 0.3f),
                                      Shift(Osc(390f, 0.08f, 15f, 0.28f, harm2: 0.3f), 0.07f))),
+            // Lightning: all-noise thunder, "faint crackle" flavour — a bright crack, a dark
+            // low chest, a deep slow-decaying rumble bed for weight, a touch of sub movement,
+            // and a few quiet high ticks spread across the first half-second.
+            Sfx.LightningCrack => Make(Mix(
+                                     NoiseBurst(0.16f, 22f, 0.50f, bright: true),
+                                     NoiseBurst(0.40f,  7f, 0.40f, bright: false),
+                                     NoiseBurst(1.90f,  2.2f, 0.50f, bright: false),
+                                     FallOsc(70f, 34f, 1.40f, 2.0f, 0.32f),
+                                     Click(0.004f, 0.45f),
+                                     Shift(NoiseBurst(0.03f, 30f, 0.14f, bright: true), 0.05f),
+                                     Shift(NoiseBurst(0.03f, 30f, 0.12f, bright: true), 0.13f),
+                                     Shift(NoiseBurst(0.03f, 30f, 0.10f, bright: true), 0.24f),
+                                     Shift(NoiseBurst(0.03f, 30f, 0.09f, bright: true), 0.36f),
+                                     Shift(NoiseBurst(0.03f, 30f, 0.08f, bright: true), 0.50f))),
             _                 => Sine(440f,  0.1f,   decay: 5f,  amp: 0.4f),
         };
 
@@ -647,39 +683,58 @@ namespace NW.App
         // Each theme is a unique 4-bar loop with its own chord progression, BPM,
         // and lead melody line. Layers are mixed additively then normalized.
 
+        static float ThemeBpm(int theme) => theme switch
+        {
+            0 => 130f, 1 => 126f, 2 => 112f, 3 =>  96f,
+            4 => 138f, 5 =>  88f, 6 => 124f, 7 =>  76f,
+            _ => 120f
+        };
+
+        // Themes 0,1,2,4,6,7 are reworked onto the new scale/chord/section foundation.
+        // Themes 3 and 5 stay on the legacy path permanently — their harmonic/melodic
+        // content (and Medieval Crimson's/Sakura Dusk's timbres) is preserved exactly.
+        static ResolvedMusic GetResolvedMusic(int theme) => theme switch
+        {
+            0 => BuildTheme0Resolved(),
+            1 => BuildTheme1Resolved(),
+            2 => BuildTheme2Resolved(),
+            4 => BuildTheme4Resolved(),
+            6 => BuildTheme6Resolved(),
+            7 => BuildTheme7Resolved(),
+            _ => BuildLegacyResolved(theme), // 3, 5
+        };
+
         static AudioClip BuildMusic(int theme)
         {
-            float bpm = theme switch
-            {
-                0 => 130f, 1 => 126f, 2 => 112f, 3 =>  96f,
-                4 => 138f, 5 =>  88f, 6 => 124f, 7 =>  76f,
-                _ => 120f
-            };
-
+            float bpm  = ThemeBpm(theme);
             float bps  = bpm / 60f;
             float beat = 1f / bps;
             float bar  = beat * 4f;
-            float loop = bar * 4f;          // 4-bar loop
+
+            var rm = GetResolvedMusic(theme);
+            int totalBars = rm.TotalBars;
+            float loop = bar * totalBars;
             int   N    = Samples(loop);
             var   buf  = new float[N];
             var   rng  = new System.Random(theme * 137 + 7);
 
-            float[][] pad  = MusicPadChords(theme);  // [4 bars][chord freq array]
-            float[]   bass = MusicBassRoots(theme);  // bass root Hz per bar
-            float[]   lead = MusicLeadLine(theme);   // 8 melody notes
+            // Themes 3 and 5 already sound right — never humanize them, and skip the
+            // rng draws entirely so their drum layer's random sequence (which does use
+            // this same rng) stays bit-identical to before this pass.
+            bool humanize = kHumanize && theme != 3 && theme != 5;
+            int   Jitter() => humanize ? rng.Next(-60, 60) : 0;
+            float Vel()    => humanize ? 0.90f + 0.20f * (float)rng.NextDouble() : 1f;
 
-            bool hasDrums  = theme != 7;   // Dawn is beatless/ambient
-            bool fourFloor = theme == 4;   // Industrial: kick every beat
-
-            for (int b = 0; b < 4; b++)
+            for (int b = 0; b < totalBars; b++)
             {
                 float bs = b * bar;
+                float[] chord = rm.ChordHz[b];
 
                 // ── Chord pad: theme-specific synthesized texture ─────────────
                 float padDur = bar * 0.96f;
                 float padAtk = theme == 5 ? 0.006f : beat * 0.9f;  // Sakura: instant pluck
                 float padRel = beat * 1.0f;
-                foreach (float pf in pad[b])
+                foreach (float pf in chord)
                     WritePadNote(buf, N, (int)(bs * SR), pf, padDur, padAtk, padRel, 0.15f, theme);
 
                 // ── Bar arpeggio: 4 quick chord tones at 16th-note intervals ──
@@ -687,48 +742,50 @@ namespace NW.App
                 {
                     float sixteenth = beat * 0.25f;
                     float arpAmp    = theme == 5 ? 0.07f : 0.09f;
-                    float[] ac      = pad[b];
                     for (int k = 0; k < 4; k++)
                     {
-                        float arpHz = k < ac.Length ? ac[k] * 2f : ac[0] * 4f;
+                        float arpHz = k < chord.Length ? chord[k] * 2f : chord[0] * 4f;
                         int arpSt   = (int)((bs + k * sixteenth) * SR);
                         MusicCounterNote(buf, N, arpSt, arpHz, sixteenth * 0.78f, arpAmp);
                     }
                 }
 
-                // ── Bass: root on beats 1+3, fifth on 2+4 ────────────────────
-                float root = bass[b], fifth = root * 1.498f;
-                float[] bfreq = { root, fifth, root, fifth };
+                // ── Bass ───────────────────────────────────────────────────────
+                float[] bfreq = rm.BassBeatHz[b];
                 float[] bdur  = { beat * 0.82f, beat * 0.78f, beat * 0.82f, beat * 0.78f };
+                // Deterministic metric accent: beat 1 > beat 3 > beats 2/4.
+                float[] beatAccent = { 1.0f, 0.85f, 0.95f, 0.85f };
                 for (int k = 0; k < 4; k++)
                 {
                     float bt = bs + k * beat;
                     float bf = bfreq[k], bd = bdur[k];
+                    int   startSample = Mathf.Max(0, (int)(bt * SR) + Jitter());
+                    float vel = Vel() * beatAccent[k];
                     int bN = Samples(bd);
                     for (int i = 0; i < bN; i++)
                     {
-                        int si = (int)(bt * SR) + i;
-                        if (si >= N) break;
+                        int si = startSample + i;
+                        if (si < 0 || si >= N) continue;
                         float t   = i / (float)SR;
                         float env = MusicEnv(t, bd, 0.008f, bd * 0.35f, squared: false);
                         float s   = Mathf.Sin(Tau(bf,      t)) * 0.65f
                                   + Mathf.Sin(Tau(bf * 2f, t)) * 0.22f
                                   + Mathf.Sin(Tau(bf * 3f, t)) * 0.09f;
-                        buf[si] += s * env * 0.32f;
+                        buf[si] += s * env * 0.32f * vel;
                     }
                 }
 
                 // ── Drums ──────────────────────────────────────────────────────
-                if (hasDrums)
+                if (rm.HasDrums)
                 {
-                    int[] kickBeats = fourFloor ? new[]{0,1,2,3} : new[]{0,2};
+                    int[] kickBeats = rm.FourFloor ? new[]{0,1,2,3} : new[]{0,2};
                     foreach (int k in kickBeats)
                         MusicKick(buf, N, (int)((bs + k * beat) * SR));
 
                     MusicSnare(buf, N, (int)((bs + beat)        * SR), rng);
                     MusicSnare(buf, N, (int)((bs + 3f * beat)   * SR), rng);
 
-                    float chordRoot = pad[b % 4][0];
+                    float chordRoot = chord[0];
                     for (int h = 0; h < 8; h++)
                     {
                         int hStart = (int)((bs + h * beat * 0.5f) * SR);
@@ -742,8 +799,8 @@ namespace NW.App
                         }
                     }
 
-                    // Bar-4 drum fill: 16th-note hi-hat cascade on beats 3–4 (turnaround feel)
-                    if (b == 3)
+                    // Drum fill: 16th-note hi-hat cascade on beats 3-4 (turnaround feel)
+                    if (rm.DrumFillBar[b])
                     {
                         for (int hf = 0; hf < 8; hf++)
                         {
@@ -754,57 +811,42 @@ namespace NW.App
                 }
             }
 
-            // ── Lead melody: 8 notes, one every half-bar ─────────────────────
-            float leadDur = beat * 1.88f;
+            // ── Lead melody ────────────────────────────────────────────────────
             float leadAtk = beat * 0.04f;
             float leadRel = beat * 0.55f;
-            for (int i = 0; i < 8; i++)
+            foreach (var ln in rm.LeadNotes)
             {
-                float lt = i * bar * 0.5f;
-                MusicLeadNote(buf, N, (int)(lt * SR), lead[i], leadDur, leadAtk, leadRel, theme);
+                int   startSample = Mathf.Max(0, (int)(ln.StartBeat * beat * SR) + Jitter());
+                float dur         = ln.DurBeats * beat;
+                MusicLeadNote(buf, N, startSample, ln.Hz, dur, leadAtk, leadRel, theme, Vel());
             }
 
-            // ── Counter-melody: responds in bars 2 & 4 (quarter-note chord tones) ──
-            if (theme != 7)  // not Dawn
+            // ── Counter-melody ─────────────────────────────────────────────────
+            foreach (var cn in rm.CounterNotes)
             {
-                float cAmp = theme == 5 ? 0.10f : 0.12f;
-                for (int b = 1; b < 4; b += 2)  // bars 2 and 4 (0-indexed)
-                {
-                    float bs   = b * bar;
-                    float[] cn = pad[b];
-                    for (int k = 0; k < 4; k++)
-                    {
-                        float cHz = k < cn.Length ? cn[k] * 2f : cn[cn.Length - 1] * 4f;
-                        MusicCounterNote(buf, N, (int)((bs + k * beat) * SR), cHz, beat * 0.88f, cAmp);
-                    }
-                }
+                int startSample = Mathf.Max(0, (int)(cn.StartBeat * beat * SR) + Jitter());
+                MusicCounterNote(buf, N, startSample, cn.Hz, cn.DurBeats * beat, cn.Amp * Vel());
             }
 
-            // ── Syncopated stabs ("and of 2" per bar) + bar-4 arpeggio fill ──
-            float stabVol = theme switch
+            // ── Syncopated stabs + turnaround arpeggio fill ───────────────────
+            if (rm.StabVol > 0f)
             {
-                4 => 0.12f,  // Industrial: punchy
-                5 => 0.06f,  // Sakura: delicate
-                7 => 0.00f,  // Dawn: beatless, no stabs
-                _ => 0.09f,
-            };
-            if (stabVol > 0f)
-            {
-                for (int b = 0; b < 4; b++)
+                for (int b = 0; b < totalBars; b++)
                 {
                     float bs     = b * bar;
-                    float stabHz = pad[b][0] * 2f;  // chord root, upper octave
+                    float stabHz = rm.ChordHz[b][0] * 2f;  // chord root, upper octave
                     // "and of 2" — syncopated hit after beat 2
-                    MusicStab(buf, N, (int)((bs + beat * 2.5f) * SR), stabHz, stabVol);
-                    // Driving themes also hit "and of 1" on odd bars for extra momentum
-                    if ((theme == 0 || theme == 1 || theme == 4) && b % 2 == 1)
-                        MusicStab(buf, N, (int)((bs + beat * 0.5f) * SR), stabHz, stabVol * 0.70f);
+                    MusicStab(buf, N, Mathf.Max(0, (int)((bs + beat * 2.5f) * SR) + Jitter()), stabHz, rm.StabVol * Vel());
+                    // Driving themes also hit "and of 1" for extra momentum
+                    if (rm.ExtraSyncBar[b])
+                        MusicStab(buf, N, Mathf.Max(0, (int)((bs + beat * 0.5f) * SR) + Jitter()), stabHz, rm.StabVol * 0.70f * Vel());
                 }
 
-                // Bar-4 turnaround: 4-note ascending arpeggio on last beat (16th notes)
-                float fillBase    = 3f * bar + 3f * beat;
-                float sixteenth   = beat * 0.25f;
-                float[] fc        = pad[3];
+                // Turnaround: 4-note ascending arpeggio on the last beat of the loop
+                int     lastBar   = totalBars - 1;
+                float   fillBase  = lastBar * bar + 3f * beat;
+                float   sixteenth = beat * 0.25f;
+                float[] fc        = rm.ChordHz[lastBar];
                 float[] fillNotes = fc.Length >= 3
                     ? new[]{ fc[0] * 2f, fc[1] * 2f, fc[2] * 2f, fc[0] * 4f }
                     : new[]{ fc[0] * 2f, fc[0] * 2.52f, fc[0] * 3f, fc[0] * 4f };
@@ -823,6 +865,472 @@ namespace NW.App
             }
 
             return Make(buf);
+        }
+
+        // ── legacy resolver: reproduces today's 4-bar output exactly ─────────────
+        static ResolvedMusic BuildLegacyResolved(int theme)
+        {
+            float[][] pad  = MusicPadChords(theme);
+            float[]   bass = MusicBassRoots(theme);
+            float[]   lead = MusicLeadLine(theme);
+
+            var bassBeats = new float[4][];
+            for (int b = 0; b < 4; b++)
+            {
+                float root = bass[b], fifth = root * 1.498f;
+                bassBeats[b] = new[] { root, fifth, root, fifth };
+            }
+
+            var drumFill = new[] { false, false, false, true };
+
+            var extraSync = new bool[4];
+            for (int b = 0; b < 4; b++)
+                extraSync[b] = (theme == 0 || theme == 1 || theme == 4) && b % 2 == 1;
+
+            var leadNotes = new LeadNote[8];
+            for (int i = 0; i < 8; i++)
+                leadNotes[i] = new LeadNote { Hz = lead[i], StartBeat = i * 2f, DurBeats = 1.88f };
+
+            var counterList = new List<CounterNote>();
+            if (theme != 7)
+            {
+                float cAmp = theme == 5 ? 0.10f : 0.12f;
+                for (int b = 1; b < 4; b += 2)  // bars 2 and 4 (0-indexed)
+                {
+                    float[] cn = pad[b];
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float cHz = k < cn.Length ? cn[k] * 2f : cn[cn.Length - 1] * 4f;
+                        counterList.Add(new CounterNote { Hz = cHz, StartBeat = b * 4f + k, DurBeats = 0.88f, Amp = cAmp });
+                    }
+                }
+            }
+
+            float stabVol = theme switch
+            {
+                4 => 0.12f, 5 => 0.06f, 7 => 0.00f, _ => 0.09f,
+            };
+
+            return new ResolvedMusic
+            {
+                TotalBars    = 4,
+                ChordHz      = pad,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = theme != 7,
+                FourFloor    = theme == 4,
+                StabVol      = stabVol,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterList.ToArray(),
+            };
+        }
+
+        // ── theme 0 (Cyber Blue) — pilot rework on the new foundation ─────────────
+        // 8+8 bar A/B form. Section A restates the original Am-F-C-G progression twice
+        // (with a Cmaj7/G7 lift on the repeat); section B varies it with an added iv
+        // chord (Dm) and inversions before resolving back to the top of the loop.
+        static ResolvedMusic BuildTheme0Resolved()
+        {
+            const int rootMidi = 57; // A3
+            int[] scale = ScaleNatMinor;
+
+            var chordDefs = new[]
+            {
+                // Section A (bars 0-7): Am F C G Am F Cmaj7 G7
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj7),
+                new ChordDeg(6, ChordQuality.Dom7),
+                // Section B (bars 8-15): Am(inv1) F Dm G Am F C(inv1) G7 — added iv + lift
+                new ChordDeg(0, ChordQuality.Min, 1),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(3, ChordQuality.Min),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj, 1),
+                new ChordDeg(6, ChordQuality.Dom7),
+            };
+            int totalBars = chordDefs.Length;
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, chordDefs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+            var drumFill  = BuildSectionFillFlags(8, 8);
+
+            var extraSync = new bool[totalBars];
+            for (int b = 0; b < totalBars; b++) extraSync[b] = b % 2 == 1;
+
+            // Lead phrase: section A restates the original hook then a descending answer;
+            // section B climbs to a new peak then reprises the hook into a leading-tone cadence.
+            // Durations are Fibonacci-grouped (drawn from 1/2/3/5 beats) instead of a flat
+            // "one note every 2 beats" pulse — the even spacing was a big part of why this
+            // read as mechanical. (Same idea Genshin Impact's "Gilded Runner" uses: Fibonacci-
+            // length rhythmic groupings instead of an evenly-subdivided pulse.) Each phase's
+            // durations still sum to 16 beats (4 bars), so the overall form is unchanged.
+            int[] leadDegsA1 = { 11, 14, 13, 11,  9, 10, 11,  7 };   // A phase 1 (original hook)
+            int[] leadDurA1  = {  1,  5,  1,  2,  1,  1,  2,  3 };
+            int[] leadDegsA2 = {  9, 11,  9,  7,  4,  7,  9,  7 };   // A phase 2 (descending answer)
+            int[] leadDurA2  = {  2,  1,  1,  2,  5,  1,  1,  3 };
+            int[] leadDegsB1 = {  7,  9, 10, 11, 13, 14, 13, 11 };   // B phase 1 (ascending arc)
+            int[] leadDurB1  = {  1,  1,  1,  2,  2,  5,  1,  3 };
+            int[] leadDegsB2 = { 11, 14, 13, 11,  9, 10, 11, 13 };   // B phase 2 (hook reprise -> leading tone into loop)
+            int[] leadDurB2  = {  1,  5,  1,  2,  1,  1,  2,  3 };
+
+            var leadNotes = BuildLeadNotes(rootMidi, scale,
+                (leadDegsA1, leadDurA1), (leadDegsA2, leadDurA2),
+                (leadDegsB1, leadDurB1), (leadDegsB2, leadDurB2));
+
+            // Counter-melody: an independent line, not a doubled arpeggio.
+            var counterNotes = BuildBarCounterMelody(chordHz);
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = true,
+                FourFloor    = false,
+                StabVol      = 0.09f,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterNotes,
+            };
+        }
+
+        // ── theme 1 (Synthwave Purple) — same i-VI-III-VII shape as Cyber Blue, transposed ──
+        static ResolvedMusic BuildTheme1Resolved()
+        {
+            const int rootMidi = 48; // C3
+            int[] scale = ScaleNatMinor;
+
+            var chordDefs = new[]
+            {
+                // Section A (bars 0-7): Cm Ab Eb Bb Cm Ab Ebmaj7 Bb7
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj7),
+                new ChordDeg(6, ChordQuality.Dom7),
+                // Section B (bars 8-15): Cm(inv1) Ab Fm Bb Cm Ab Eb(inv1) Bb7 — added iv + lift
+                new ChordDeg(0, ChordQuality.Min, 1),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(3, ChordQuality.Min),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(2, ChordQuality.Maj, 1),
+                new ChordDeg(6, ChordQuality.Dom7),
+            };
+            int totalBars = chordDefs.Length;
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, chordDefs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+            var drumFill  = BuildSectionFillFlags(8, 8);
+
+            var extraSync = new bool[totalBars];
+            for (int b = 0; b < totalBars; b++) extraSync[b] = b % 2 == 1; // driving theme
+
+            // Same melodic shape as Cyber Blue (both are i-VI-III-VII in natural minor) —
+            // the different root/tempo/timbre/reverb response keeps them distinct.
+            int[] leadDegsA1 = { 11, 14, 13, 11,  9, 10, 11,  7 };
+            int[] leadDurA1  = {  1,  5,  1,  2,  1,  1,  2,  3 };
+            int[] leadDegsA2 = {  9, 11,  9,  7,  4,  7,  9,  7 };
+            int[] leadDurA2  = {  2,  1,  1,  2,  5,  1,  1,  3 };
+            int[] leadDegsB1 = {  7,  9, 10, 11, 13, 14, 13, 11 };
+            int[] leadDurB1  = {  1,  1,  1,  2,  2,  5,  1,  3 };
+            int[] leadDegsB2 = { 11, 14, 13, 11,  9, 10, 11, 13 };
+            int[] leadDurB2  = {  1,  5,  1,  2,  1,  1,  2,  3 };
+
+            var leadNotes = BuildLeadNotes(rootMidi, scale,
+                (leadDegsA1, leadDurA1), (leadDegsA2, leadDurA2),
+                (leadDegsB1, leadDurB1), (leadDegsB2, leadDurB2));
+            var counterNotes = BuildBarCounterMelody(chordHz);
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = true,
+                FourFloor    = false,
+                StabVol      = 0.09f,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterNotes,
+            };
+        }
+
+        // ── theme 2 (Biopunk Green) — i-V(borrowed maj)-iv-VII, a distinct "tense" shape ──
+        static ResolvedMusic BuildTheme2Resolved()
+        {
+            const int rootMidi = 57; // A3
+            int[] scale = ScaleNatMinor;
+
+            var chordDefs = new[]
+            {
+                // Section A (bars 0-7): Am E(borrowed major dominant) Dm G Am E7 Dm7 G
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(4, ChordQuality.Maj),
+                new ChordDeg(3, ChordQuality.Min),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(4, ChordQuality.Dom7),
+                new ChordDeg(3, ChordQuality.Min7),
+                new ChordDeg(6, ChordQuality.Maj),
+                // Section B (bars 8-15): Am(inv1) E F(new colour chord) G Am E7 Dm(inv1) G7
+                new ChordDeg(0, ChordQuality.Min, 1),
+                new ChordDeg(4, ChordQuality.Maj),
+                new ChordDeg(5, ChordQuality.Maj),
+                new ChordDeg(6, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Min),
+                new ChordDeg(4, ChordQuality.Dom7),
+                new ChordDeg(3, ChordQuality.Min, 1),
+                new ChordDeg(6, ChordQuality.Dom7),
+            };
+            int totalBars = chordDefs.Length;
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, chordDefs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+            var drumFill  = BuildSectionFillFlags(8, 8);
+
+            var extraSync = new bool[totalBars]; // Biopunk was never in the "driving" extra-sync set
+
+            // Distinct "tense" contour built from the original hook (rise then a full
+            // descending run) instead of the flat 8-note loop.
+            int[] leadDegsA1 = { 7, 9, 11,  9, 7, 6, 5, 4 };
+            int[] leadDurA1  = { 1, 2,  5,  2, 1, 1, 1, 3 };
+            int[] leadDegsA2 = { 4, 5,  6,  4, 2, 4, 6, 7 };
+            int[] leadDurA2  = { 2, 1,  1,  2, 5, 1, 1, 3 };
+            int[] leadDegsB1 = { 7, 9, 10, 11, 13, 14, 13, 11 };
+            int[] leadDurB1  = { 1, 1,  1,  2,  2,  5,  1,  3 };
+            int[] leadDegsB2 = { 7, 9, 11,  9,  7,  6,  5,  6 };
+            int[] leadDurB2  = { 1, 2,  5,  2,  1,  1,  1,  3 };
+
+            var leadNotes = BuildLeadNotes(rootMidi, scale,
+                (leadDegsA1, leadDurA1), (leadDegsA2, leadDurA2),
+                (leadDegsB1, leadDurB1), (leadDegsB2, leadDurB2));
+            var counterNotes = BuildBarCounterMelody(chordHz);
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = true,
+                FourFloor    = false,
+                StabVol      = 0.09f,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterNotes,
+            };
+        }
+
+        // ── theme 4 (Industrial Ghost) — 16+8+8 bar form with a borrowed-iv bridge ──────
+        static ResolvedMusic BuildTheme4Resolved()
+        {
+            const int rootMidi = 40; // E3
+            int[] scale = ScaleNatMinor;
+
+            var chordDefs = new List<ChordDeg>();
+            // Section A (16 bars): Em C G D, repeated with a lift on the last repeat
+            for (int rep = 0; rep < 3; rep++)
+            {
+                chordDefs.Add(new ChordDeg(0, ChordQuality.Min));
+                chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+                chordDefs.Add(new ChordDeg(2, ChordQuality.Maj));
+                chordDefs.Add(new ChordDeg(6, ChordQuality.Maj));
+            }
+            chordDefs.Add(new ChordDeg(0, ChordQuality.Min));
+            chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(2, ChordQuality.Maj7));
+            chordDefs.Add(new ChordDeg(6, ChordQuality.Dom7));
+            // Bridge (8 bars): borrowed iv (Am) for harmonic contrast
+            chordDefs.Add(new ChordDeg(3, ChordQuality.Min));
+            chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(2, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(6, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(3, ChordQuality.Min));
+            chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(2, ChordQuality.Maj7));
+            chordDefs.Add(new ChordDeg(6, ChordQuality.Dom7));
+            // Return A' (8 bars): back to Em
+            chordDefs.Add(new ChordDeg(0, ChordQuality.Min));
+            chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(2, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(6, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(0, ChordQuality.Min));
+            chordDefs.Add(new ChordDeg(5, ChordQuality.Maj));
+            chordDefs.Add(new ChordDeg(2, ChordQuality.Maj7));
+            chordDefs.Add(new ChordDeg(6, ChordQuality.Dom7));
+
+            var defs = chordDefs.ToArray();
+            int totalBars = defs.Length; // 32
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, defs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+            var drumFill  = BuildSectionFillFlags(16, 8, 8);
+
+            var extraSync = new bool[totalBars];
+            for (int b = 0; b < totalBars; b++) extraSync[b] = b % 2 == 1; // driving theme
+
+            int[] hookDegs    = { 21, 23, 25, 23, 21, 20, 18, 21 };
+            int[] hookDurs    = {  1,  2,  5,  2,  1,  1,  1,  3 };
+            int[] ansDegs     = { 18, 20, 21, 20, 18, 16, 14, 18 };
+            int[] ansDurs     = {  2,  1,  1,  2,  5,  1,  1,  3 };
+            // Bridge: fewer, longer-held notes — this system's drum pattern is per-theme
+            // rather than per-bar, so the "thin the bridge" contrast comes from sparser
+            // melodic content and the borrowed chord above instead of dropping drum layers.
+            int[] bridge1Degs = { 18, 21, 23, 21 };
+            int[] bridge1Durs = {  3,  5,  5,  3 };
+            int[] bridge2Degs = { 16, 18, 21, 18 };
+            int[] bridge2Durs = {  3,  5,  5,  3 };
+
+            var leadNotes = BuildLeadNotes(rootMidi, scale,
+                (hookDegs, hookDurs), (ansDegs, ansDurs), (hookDegs, hookDurs), (ansDegs, ansDurs),
+                (bridge1Degs, bridge1Durs), (bridge2Degs, bridge2Durs),
+                (hookDegs, hookDurs), (ansDegs, ansDurs));
+            var counterNotes = BuildBarCounterMelody(chordHz);
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = true,
+                FourFloor    = true,
+                StabVol      = 0.12f,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterNotes,
+            };
+        }
+
+        // ── theme 6 (Solar Forge) — 16+8+8 bar form, relative-minor bridge ──────────────
+        static ResolvedMusic BuildTheme6Resolved()
+        {
+            const int rootMidi = 60; // C4
+            int[] scale = ScaleMajor;
+
+            var chordDefs = new List<ChordDeg>
+            {
+                // Section A (16 bars): C F G C, with subtle lifts each repeat
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Maj), new ChordDeg(0, ChordQuality.Maj),
+
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Maj), new ChordDeg(0, ChordQuality.Maj, 1),
+
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Dom7), new ChordDeg(0, ChordQuality.Maj),
+
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Maj), new ChordDeg(0, ChordQuality.Maj7),
+
+                // Bridge (8 bars): relative minor (Am) for contrast
+                new ChordDeg(5, ChordQuality.Min), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Maj), new ChordDeg(0, ChordQuality.Maj),
+                new ChordDeg(5, ChordQuality.Min), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Dom7), new ChordDeg(0, ChordQuality.Maj),
+
+                // Return A' (8 bars): the triumphant C F G C
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Maj), new ChordDeg(0, ChordQuality.Maj),
+                new ChordDeg(0, ChordQuality.Maj), new ChordDeg(3, ChordQuality.Maj),
+                new ChordDeg(4, ChordQuality.Dom7), new ChordDeg(0, ChordQuality.Maj),
+            };
+
+            var defs = chordDefs.ToArray();
+            int totalBars = defs.Length; // 32
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, defs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+            var drumFill  = BuildSectionFillFlags(16, 8, 8);
+
+            var extraSync = new bool[totalBars]; // Solar Forge was never in the "driving" extra-sync set
+
+            int[] hookDegs    = {  9, 11, 14, 11, 12, 11,  9,  7 };
+            int[] hookDurs    = {  1,  2,  5,  2,  1,  1,  1,  3 };
+            int[] ansDegs     = {  7,  9,  7,  4,  2,  4,  7,  4 };
+            int[] ansDurs     = {  2,  1,  1,  2,  5,  1,  1,  3 };
+            int[] bridge1Degs = { 11, 14, 12, 14 };
+            int[] bridge1Durs = {  3,  5,  5,  3 };
+            int[] bridge2Degs = {  9, 11,  9,  7 };
+            int[] bridge2Durs = {  3,  5,  5,  3 };
+
+            var leadNotes = BuildLeadNotes(rootMidi, scale,
+                (hookDegs, hookDurs), (ansDegs, ansDurs), (hookDegs, hookDurs), (ansDegs, ansDurs),
+                (bridge1Degs, bridge1Durs), (bridge2Degs, bridge2Durs),
+                (hookDegs, hookDurs), (ansDegs, ansDurs));
+            var counterNotes = BuildBarCounterMelody(chordHz);
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = drumFill,
+                HasDrums     = true,
+                FourFloor    = false,
+                StabVol      = 0.09f,
+                ExtraSyncBar = extraSync,
+                LeadNotes    = leadNotes,
+                CounterNotes = counterNotes,
+            };
+        }
+
+        // ── theme 7 (Dawn Light) — single 8-bar section, still beatless/ambient ─────────
+        static ResolvedMusic BuildTheme7Resolved()
+        {
+            const int rootMidi = 60; // C4
+            int[] scale = ScaleMajor;
+
+            var chordDefs = new[]
+            {
+                new ChordDeg(0, ChordQuality.Maj),    // C
+                new ChordDeg(5, ChordQuality.Min),    // Am
+                new ChordDeg(3, ChordQuality.Maj),    // F
+                new ChordDeg(4, ChordQuality.Maj),    // G
+                new ChordDeg(0, ChordQuality.Maj7),   // Cmaj7 — a small lift on the repeat
+                new ChordDeg(5, ChordQuality.Min7),   // Am7
+                new ChordDeg(3, ChordQuality.Maj),    // F
+                new ChordDeg(4, ChordQuality.Maj),    // G
+            };
+            int totalBars = chordDefs.Length; // 8
+
+            var (chordHz, chordRootDeg) = ResolveChords(rootMidi, scale, chordDefs);
+            var bassBeats = BassPatternForBars(rootMidi, scale, chordRootDeg);
+
+            int[] phase1Degs = {  7,  9, 11,  9, 10, 12, 11,  9 };
+            int[] phase1Durs = {  1,  1,  1,  2,  2,  5,  1,  3 };
+            int[] phase2Degs = {  9,  7,  5,  7,  9, 10,  9,  7 };
+            int[] phase2Durs = {  2,  1,  1,  2,  5,  1,  1,  3 };
+            var leadNotes = BuildLeadNotes(rootMidi, scale, (phase1Degs, phase1Durs), (phase2Degs, phase2Durs));
+
+            return new ResolvedMusic
+            {
+                TotalBars    = totalBars,
+                ChordHz      = chordHz,
+                BassBeatHz   = bassBeats,
+                DrumFillBar  = new bool[totalBars], // unused — Dawn is beatless
+                HasDrums     = false,
+                FourFloor    = false,
+                StabVol      = 0.00f,
+                ExtraSyncBar = new bool[totalBars],
+                LeadNotes    = leadNotes,
+                CounterNotes = Array.Empty<CounterNote>(),
+            };
         }
 
         // ── music layer writers ────────────────────────────────────────────────
@@ -1113,21 +1621,42 @@ namespace NW.App
         // Theme-matched lead instrument: saw for cyber/synth, FM for biopunk, pluck for medieval,
         // odd-harmonic for industrial, piano for sakura, guitar for solar, flute for dawn.
         static void MusicLeadNote(float[] buf, int N, int start, float freq,
-                                  float dur, float atk, float rel, int theme)
+                                  float dur, float atk, float rel, int theme, float vel = 1f)
         {
             int len = Samples(dur);
             switch (theme)
             {
-                case 0: // CYBER BLUE — sawtooth synth (8 harmonics)
+                case 0: // CYBER BLUE — analog-style synth lead: 2-osc detuned TRUE sawtooth
+                        // (not a hand-capped harmonic sum, which reads thin/muffled next to a
+                        // real saw's full bright buzz), crossfaded from a soft sine into the
+                        // full saw over the attack to fake a filter opening, plus a quick
+                        // pitch-glide into each note and late vibrato for real synth-lead life.
                 {
+                    double ph1 = 0, ph2 = 0;
                     for (int i = 0; i < len; i++)
                     {
                         int si = start + i; if (si >= N) break;
                         float t   = i / (float)SR;
                         float env = MusicEnv(t, dur, atk, rel, squared: false);
-                        float s   = 0f;
-                        for (int h = 1; h <= 8; h++) s += Mathf.Sin(Tau(freq * h, t)) / h;
-                        buf[si] += s * 0.42f * env * 0.26f;
+
+                        float glide = t < 0.03f ? Mathf.Lerp(0.94f, 1f, t / 0.03f) : 1f;
+                        float vib   = t > 0.12f ? 1f + 0.006f * Mathf.Sin(t * 5.5f * 2f * Mathf.PI) : 1f;
+                        float f     = freq * glide * vib;
+
+                        ph1 += f * 1.006 / SR; ph1 -= System.Math.Floor(ph1);
+                        ph2 += f * 0.994 / SR; ph2 -= System.Math.Floor(ph2);
+
+                        float saw1 = (float)(2.0 * ph1 - 1.0);
+                        float saw2 = (float)(2.0 * ph2 - 1.0);
+                        float sawSum  = (saw1 + saw2) * 0.5f;
+                        float darkSum = (float)(System.Math.Sin(ph1 * 2 * System.Math.PI) + System.Math.Sin(ph2 * 2 * System.Math.PI)) * 0.5f;
+
+                        // Filter-envelope: blend from a soft sine (filter closed) into the
+                        // full bright saw (filter open) over the first ~150ms of the note.
+                        float bright = Mathf.Clamp01(t / 0.15f);
+                        float s = Mathf.Lerp(darkSum, sawSum, bright);
+
+                        buf[si] += s * 0.34f * env * 0.30f * vel;
                     }
                     break;
                 }
@@ -1142,21 +1671,36 @@ namespace NW.App
                         for (int h = 1; h <= 6; h++)
                             s += (Mathf.Sin(Tau(freq * h * 1.005f, t))
                                 + Mathf.Sin(Tau(freq * h * 0.995f, t))) / h;
-                        buf[si] += s * 0.38f * env * 0.24f;
+                        buf[si] += s * 0.38f * env * 0.24f * vel;
                     }
                     break;
                 }
-                case 2: // BIOPUNK GREEN — FM modulated (organic warble)
+                case 2: // BIOPUNK GREEN — organic FM growl: modulation index decays from a
+                        // sharp "creature" attack into a smoother sustained tone, an inharmonic
+                        // modulator ratio for a less clean/beepy timbre, a slow breath-like pitch
+                        // drift, and a sub-fundamental for body. A fixed modulation index/ratio
+                        // (the old version) never changes shape, which is exactly what reads as
+                        // a static "beeper" rather than something organic.
                 {
-                    double ph = 0;
+                    double ph = 0, phMod = 0;
                     for (int i = 0; i < len; i++)
                     {
                         int si = start + i; if (si >= N) break;
                         float t   = i / (float)SR;
                         float env = MusicEnv(t, dur, atk, rel, squared: false);
-                        float mod = Mathf.Sin(Tau(freq * 2.7f, t)) * 2.5f;
-                        ph += freq / SR;
-                        buf[si] += Mathf.Sin((float)(ph * 2 * System.Math.PI) + mod) * env * 0.22f;
+
+                        float breath = 1f + 0.012f * Mathf.Sin(t * 3.1f * 2f * Mathf.PI);
+                        float f      = freq * breath;
+
+                        float modIndex = 2.6f * Mathf.Exp(-t * 4.0f) + 0.6f;
+                        phMod += f * 2.37 / SR;
+                        float mod = (float)System.Math.Sin(phMod * 2 * System.Math.PI) * modIndex;
+
+                        ph += f / SR;
+                        float s = (float)System.Math.Sin(ph * 2 * System.Math.PI + mod);
+                        s += Mathf.Sin(Tau(f * 0.5f, t)) * 0.18f; // sub-fundamental for body
+
+                        buf[si] += s * env * 0.24f * vel;
                     }
                     break;
                 }
@@ -1171,7 +1715,7 @@ namespace NW.App
                                   + Mathf.Sin(Tau(freq * 2f, t)) * Mathf.Exp(-t *  8f) * 0.28f
                                   + Mathf.Sin(Tau(freq * 3f, t)) * Mathf.Exp(-t * 12f) * 0.11f
                                   + Mathf.Sin(Tau(freq * 4f, t)) * Mathf.Exp(-t * 18f) * 0.06f;
-                        buf[si] += s * env * 0.32f;
+                        buf[si] += s * env * 0.32f * vel;
                     }
                     break;
                 }
@@ -1184,7 +1728,7 @@ namespace NW.App
                         float env = MusicEnv(t, dur, atk, rel, squared: false);
                         float s   = 0f;
                         for (int h = 1; h <= 9; h += 2) s += Mathf.Sin(Tau(freq * h, t)) / h;
-                        buf[si] += s * 0.50f * env * 0.26f;
+                        buf[si] += s * 0.50f * env * 0.26f * vel;
                     }
                     break;
                 }
@@ -1198,7 +1742,7 @@ namespace NW.App
                         float s   = Mathf.Sin(Tau(freq,      t)) * 0.65f
                                   + Mathf.Sin(Tau(freq * 2f, t)) * Mathf.Exp(-t *  7f) * 0.24f
                                   + Mathf.Sin(Tau(freq * 3f, t)) * Mathf.Exp(-t * 12f) * 0.09f;
-                        buf[si] += s * env * 0.30f;
+                        buf[si] += s * env * 0.30f * vel;
                     }
                     break;
                 }
@@ -1212,7 +1756,7 @@ namespace NW.App
                         float s   = Mathf.Sin(Tau(freq,      t)) * 0.60f
                                   + Mathf.Sin(Tau(freq * 2f, t)) * Mathf.Exp(-t * 4.5f) * 0.28f
                                   + Mathf.Sin(Tau(freq * 3f, t)) * Mathf.Exp(-t * 7.0f) * 0.12f;
-                        buf[si] += s * env * 0.30f;
+                        buf[si] += s * env * 0.30f * vel;
                     }
                     break;
                 }
@@ -1228,7 +1772,7 @@ namespace NW.App
                         ph += freq * vib / SR;
                         float s = Mathf.Sin((float)(ph * 2 * System.Math.PI)) * 0.72f
                                 + Mathf.Sin(Tau(freq * 2f, t)) * 0.18f;
-                        buf[si] += s * env * 0.26f;
+                        buf[si] += s * env * 0.26f * vel;
                     }
                     break;
                 }

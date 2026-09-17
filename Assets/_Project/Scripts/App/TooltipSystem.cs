@@ -128,9 +128,11 @@ namespace NW.App
         {
             string displayName = ThemeLocale.TroopName(id);
             int theme = GameSettings.ThemeIndex;
-            string body = theme == 2 ? BiopunkTroopBody(id)
+            string body = theme == 1 ? SynthwaveTroopBody(id)
+                        : theme == 2 ? BiopunkTroopBody(id)
                         : theme == 3 ? MedievalTroopBody(id)
                         : theme == 4 ? IndustrialTroopBody(id)
+                        : theme == 5 ? SakuraTroopBody(id)
                         : theme == 6 ? SolarTroopBody(id)
                         : theme == 7 ? DawnTroopBody(id)
                         : CyberpunkTroopBody(id);
@@ -220,13 +222,27 @@ namespace NW.App
             "drone"       => "Cheap. Fast. Expendable. They asked for danger pay. We gave them more drones.",
             "trooper"     => "Neural-linked infantry. Augmented reflexes, zero hesitation. The backbone of your assault.",
             "sniper"      => "One shot, one kill at maximum range. Very dramatic. Very effective. They never see it coming.",
-            "mech"        => "4 tons of hydraulic fury. Slow enough that enemies have time to seriously regret their choices.",
+            "mech"        => "A hydraulic tower of fury. Slow enough that enemies have time to seriously regret their choices.",
             "shield-bot"  => "The bullet magnet your squad needs. Loves taking hits so your fragile units don't have to.",
             "interceptor" => "Delta-wing hunter-killer. Dominates the airspace. Hates being grounded. Or ignored.",
-            "hacker"      => "No weapon. Just code. Corrupts enemy targeting from extreme range. Your enemies will be confused.",
-            "titan"       => "500HP walking apocalypse. Shoulder-mounted doom cannons. Unlocked at clearance level 15.",
-            "turret"      => "Stays where planted. Dual barrels, 360° arc. Excellent for holding pylons. Zero morale issues.",
+            "hacker"      => "No weapon. Just code. Scrambles enemy targeting from extreme range. Confusing, on purpose.",
+            "titan"       => "A walking apocalypse with shoulder-mounted doom cannons. Everything gets out of the way. Eventually.",
+            "turret"      => "Stays exactly where it's planted. Dual barrels, full coverage, zero morale issues.",
             _             => "Combat unit. Fights enemies. Doesn't ask questions. Has its own perspective on overtime.",
+        };
+
+        static string SynthwaveTroopBody(string id) => id switch
+        {
+            "drone"       => "A flickering hologram with a mean streak. Glitches through defenses before anyone notices it's not real.",
+            "trooper"     => "Chrome jacket, faster reflexes than sense. Runs the front line like it's still on the grid.",
+            "sniper"      => "Fades into the neon haze and puts one shot exactly where it needs to go. Never seen leaving.",
+            "mech"        => "A synth-chassis cruiser built for looking incredible while flattening things. Mostly succeeds at both.",
+            "shield-bot"  => "Chrome plating, endless patience. Stands between you and the bad decisions so you don't have to.",
+            "interceptor" => "A hover-bike with a grudge. Crosses the lane before its own neon trail catches up.",
+            "hacker"      => "No gun, just a deck and bad intentions. Slides through enemy targeting like it was never there.",
+            "titan"       => "A chrome monolith that hums before it hits. Nobody's sure what's inside. Nobody's checking.",
+            "turret"      => "Bolted to the grid and staying there. Sweeps its arc all night, neon never flickers.",
+            _             => "Combat unit. Fights enemies. Looks good doing it.",
         };
 
         static string MedievalTroopBody(string id) => id switch
@@ -269,6 +285,20 @@ namespace NW.App
             "titan"       => "Bronze with molten veins. 500HP of slow, inevitable sunrise.",
             "turret"      => "Planted. Aims a mirror array down the lane and does not blink.",
             _             => "Forged unit. Fights enemies. Runs hot.",
+        };
+
+        static string SakuraTroopBody(string id) => id switch
+        {
+            "drone"       => "A drifting will-o'-the-wisp trailing petals. Looks harmless. Isn't, quite.",
+            "trooper"     => "Moves quiet, strikes quick, gone before the leaves finish falling. Reliable, in its way.",
+            "sniper"      => "Draws a bow strung with something that isn't quite string. Waits. Doesn't miss.",
+            "mech"        => "A shapeshifting raccoon spirit riding around in something enormous. Don't ask how.",
+            "shield-bot"  => "A guardian statue that decided to walk. Stands where it's needed and does not move again.",
+            "interceptor" => "A paper kite with somewhere to be. Faster than it looks, gone before you're sure.",
+            "hacker"      => "An old-world exorcist with new tricks. Reads the enemy's fortune, then makes it come true.",
+            "titan"       => "A small forest spirit wearing something much bigger. Ancient, patient, unhurried.",
+            "turret"      => "A shrine gate that has stood here longer than the war. Marks the boundary. Holds it.",
+            _             => "Spirited unit. Fights when asked. Politely.",
         };
 
         static string DawnTroopBody(string id) => id switch

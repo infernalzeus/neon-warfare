@@ -249,6 +249,28 @@ namespace NW.App
             public float   Thigh, Shin, Arm;       // neutral segment lengths
             public float   RThighF, RShinF, RThighN, RShinN, RArmF, RArmN;
             public Color   LegF, LegN, ArmF, ArmN;
+            // Stride amplitude in degrees. Every unit shared one hardcoded 29/44/24 until this
+            // was split out -- fine for a human-proportioned stride, but Strider's original
+            // baked walk only ever shifted its stance by about 2 units total, and applying the
+            // full humanoid swing to its short, wide-set legs read as an exaggerated, wrong gait
+            // rather than a proper walk. Zero here means "use the 29/44/24 default" (below), so
+            // existing entries don't need to repeat it.
+            public float   HipDeg, KneeDeg, ArmDeg;
+        }
+
+        const float DefaultHipDeg = 29f, DefaultKneeDeg = 44f, DefaultArmDeg = 24f;
+
+        /// <summary>Per-unit stride amplitude for DriveLimbRig/LimbRigView. Falls back to the
+        /// original shared 29/44/24 for any rig that doesn't set its own.</summary>
+        public static void RigSwingDeg(string id, out float hipDeg, out float kneeDeg, out float armDeg)
+        {
+            hipDeg = DefaultHipDeg; kneeDeg = DefaultKneeDeg; armDeg = DefaultArmDeg;
+            if (_rigs.TryGetValue(id, out var r))
+            {
+                if (r.HipDeg  > 0f) hipDeg  = r.HipDeg;
+                if (r.KneeDeg > 0f) kneeDeg = r.KneeDeg;
+                if (r.ArmDeg  > 0f) armDeg  = r.ArmDeg;
+            }
         }
 
         static readonly System.Collections.Generic.Dictionary<string, RigDef> _rigs =
@@ -264,6 +286,246 @@ namespace NW.App
                 RArmF = 10f, RArmN = 11.5f,
                 LegF = new Color(0.34f, 0.13f, 0.12f), LegN = new Color(0.55f, 0.22f, 0.20f),
                 ArmF = new Color(0.50f, 0.20f, 0.18f), ArmN = new Color(0.60f, 0.24f, 0.22f) } },
+            // Cyber Lancer — rig-priority unit #1. Colors are computed live from the team-tinted
+            // P3DP in BuildLimbSeg instead of these static fields (Cyber's chrome must recolor
+            // per team; kami's skin tones intentionally don't).
+            { "cybtrooper", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.6f, RShinF = 5.6f, RThighN = 7.2f, RShinN = 6.2f,
+                RArmF = 4.5f, RArmN = 5.0f } },
+            // Cyber Railgun — rig-priority unit #2.
+            { "cybsniper", new RigDef {
+                HipF = new Vector2(61f, 54f), HipN = new Vector2(65f, 54f),
+                ShF  = new Vector2(56f, 82f), ShN  = new Vector2(64f, 82f),
+                Thigh = 16.5f, Shin = 19f, Arm = 18f,
+                RThighF = 5.8f, RShinF = 5.0f, RThighN = 6.4f, RShinN = 5.6f,
+                RArmF = 4.2f, RArmN = 4.8f } },
+            // Strider is deliberately NOT rigged. It was rigged briefly this session with a
+            // reduced swing amplitude, but that still read as "weirdly animated" -- explicit
+            // direction was to drop the leg motion entirely and let it move like a cart, not
+            // keep tuning numbers on a walk cycle that doesn't suit this unit's silhouette.
+            // HasLimbRig("cybmech") is now false, so BattlefieldView/the modal/the demo lane
+            // never request part==3 for it and P3DBuildCybMech always takes its un-rigged
+            // path -- back to the plain baked Walk4 pose-swap it had before any of this.
+            // Cyber Atlas — last in the rig-priority queue, the biggest unit on screen.
+            { "cybtitan", new RigDef {
+                HipF = new Vector2(58f, 44f), HipN = new Vector2(70f, 44f),
+                ShF  = new Vector2(48f, 94f), ShN  = new Vector2(80f, 94f),
+                Thigh = 19.9f, Shin = 17.1f, Arm = 17f,
+                RThighF = 9.0f, RShinF = 7.6f, RThighN = 10.5f, RShinN = 8.8f,
+                RArmF = 9.5f, RArmN = 10.5f,
+                // Full-size swing on legs this thick and this close to the torso, at this
+                // unit's own body scale, over-swept and made the biggest unit on screen look
+                // the least composed. A heavier, shorter stride reads as weight, not just a
+                // smaller version of Lancer's brisk walk.
+                HipDeg = 20f, KneeDeg = 32f, ArmDeg = 16f } },
+            // Cyber Bastion — the shield itself stays on the body layer (see the builder's own
+            // comment); only the legs and the free arm are rigged.
+            { "cybshield", new RigDef {
+                HipF = new Vector2(60f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 14.5f, Shin = 19f, Arm = 16f,
+                RThighF = 7.6f, RShinF = 6.6f, RThighN = 8.6f, RShinN = 7.4f,
+                RArmF = 5.4f, RArmN = 5.2f } },
+
+            // Synthwave's Racer/Laser/Bouncer/Obelisk share Cyber's Lancer/Railgun/Bastion/
+            // Atlas joint coordinates and limb radii exactly (same SideJoints-based rig,
+            // authored the same way) -- these four RigDefs are direct copies.
+            { "synracer", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.6f, RShinF = 5.6f, RThighN = 7.2f, RShinN = 6.2f,
+                RArmF = 4.5f, RArmN = 5.0f } },
+            { "synlaser", new RigDef {
+                HipF = new Vector2(61f, 54f), HipN = new Vector2(65f, 54f),
+                ShF  = new Vector2(56f, 82f), ShN  = new Vector2(64f, 82f),
+                Thigh = 16.5f, Shin = 19f, Arm = 18f,
+                RThighF = 5.8f, RShinF = 5.0f, RThighN = 6.4f, RShinN = 5.6f,
+                RArmF = 4.2f, RArmN = 4.8f } },
+            { "synbouncer", new RigDef {
+                HipF = new Vector2(60f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 14.5f, Shin = 19f, Arm = 16f,
+                RThighF = 7.6f, RShinF = 6.6f, RThighN = 8.6f, RShinN = 7.4f,
+                RArmF = 5.4f, RArmN = 5.2f } },
+            { "synobelisk", new RigDef {
+                HipF = new Vector2(58f, 44f), HipN = new Vector2(70f, 44f),
+                ShF  = new Vector2(48f, 94f), ShN  = new Vector2(80f, 94f),
+                Thigh = 19.9f, Shin = 17.1f, Arm = 17f,
+                RThighF = 9.0f, RShinF = 7.6f, RThighN = 10.5f, RShinN = 8.8f,
+                RArmF = 9.5f, RArmN = 10.5f,
+                // Copied Atlas's geometry but missed copying its reduced amplitude too -- this
+                // sat on the full 29/44/24 default, the same "human-scale swing on a giant"
+                // mismatch Atlas itself had before that fix. Very likely the actual cause of
+                // "seems like four legs, not moving properly": an oversized fast swing on a
+                // unit this size reads as visual chaos, not a leg count problem.
+                HipDeg = 20f, KneeDeg = 32f, ArmDeg = 16f } },
+
+            // Biopunk: only Mutant and Carapace are true 2-legged humanoids that fit this
+            // rig (same shared SideJoints table Cyber's own trooper/shield-bot read from,
+            // same hip/shoulder anchor points). Stinger, Crawler, Hive and Swarm are built
+            // from BioSegLeg multi-leg clusters or wings, not the 2-leg SideJoints walk --
+            // structurally different, like Strider/Interceptor/Drone-without-blades were for
+            // Cyber, so they stay on the baked pose-swap. Mycelium is a real 2-leg build too,
+            // but Cyber Hacker/Synthwave Keytar were deliberately left off the live rig
+            // (bug-fixed only, never rigged) -- same call here, for the same reason.
+            { "mutant", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                // Mutant's leg is a THREE-segment digitigrade build (thigh/shin/foot) in its
+                // baked pose -- one more joint than this rig's 2-bone leg supports. Shin here
+                // folds the foot in as a fixed continuation of the same segment (reaching the
+                // same toe-tip endpoint the baked foot did), the same trick every other rigged
+                // unit already uses for its foot PLATE -- it costs the extra ankle bend during
+                // the live walk, not the digitigrade shape.
+                Thigh = 19f, Shin = 23f, Arm = 21f,
+                RThighF = 6.0f, RShinF = 4.2f, RThighN = 6.8f, RShinN = 4.9f,
+                // Withered far arm, overgrown near arm -- asymmetric on purpose, matching the
+                // baked pose's own read.
+                RArmF = 2.6f, RArmN = 8.5f } },
+            { "carapace", new RigDef {
+                HipF = new Vector2(58f, 50f), HipN = new Vector2(62f, 50f),
+                ShF  = new Vector2(58f, 76f), ShN  = new Vector2(62f, 76f),
+                Thigh = 14.5f, Shin = 19f, Arm = 16f,
+                RThighF = 7.4f, RShinF = 6.4f, RThighN = 8.6f, RShinN = 7.4f,
+                RArmF = 5.0f, RArmN = 5.0f } },
+
+            // Medieval Knight -- same hip/shoulder anchors as Cyber Trooper/Biopunk Mutant
+            // (this project's standard humanoid skeleton). Two-segment arms with no elbow
+            // sub-joint like every other rig here, so the shield and greatsword -- both
+            // hand-held -- bake onto their arm/leg segment's own texture at a fixed rest
+            // angle instead of trying to track a joint this rig doesn't have; the pauldrons
+            // and greave do the same, riding whichever segment they're mounted to.
+            { "knight", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 7.0f, RShinF = 6.0f, RThighN = 7.6f, RShinN = 6.6f,
+                RArmF = 4.7f, RArmN = 5.1f } },
+            { "archer", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.2f, RShinF = 5.4f, RThighN = 6.8f, RShinN = 5.8f,
+                RArmF = 4.3f, RArmN = 4.7f } },
+            // Paladin's far arm is a stub in the baked pose too -- shoulder to elbow, no hand
+            // (tucked behind the tower shield) -- so seg 4 bakes empty, same call as Cyber
+            // Bastion's missing far arm.
+            { "paladin", new RigDef {
+                HipF = new Vector2(58f, 54f), HipN = new Vector2(64f, 54f),
+                ShF  = new Vector2(55f, 82f), ShN  = new Vector2(63f, 82f),
+                Thigh = 18f, Shin = 16f, Arm = 19f,
+                RThighF = 8.4f, RShinF = 7.4f, RThighN = 9.4f, RShinN = 8.2f,
+                RArmF = 5.6f, RArmN = 5.6f } },
+
+            // Industrial: Worker, Gunner, Bulkhead, Engineer are all real 2-leg walkers (unlike
+            // Wizard/Hacker-role units elsewhere, Engineer has normal legs, not a hover) so all
+            // four get the same rig.
+            { "worker", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 7.0f, RShinF = 6.0f, RThighN = 7.4f, RShinN = 6.4f,
+                RArmF = 4.7f, RArmN = 5.1f } },
+            { "gunner", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.2f, RShinF = 5.4f, RThighN = 6.8f, RShinN = 5.8f,
+                RArmF = 4.4f, RArmN = 4.7f } },
+            // Bulkhead's legs are pistons (IndPiston), not plain capsules -- the rig bakes
+            // them at rest (ext=0), same "fixed at idle" trick as every hand-held prop. The
+            // blast door is body-mounted (bx, not a hand joint) so it stays outside the rig,
+            // same as Paladin's tower shield.
+            { "bulkhead", new RigDef {
+                HipF = new Vector2(58f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 17f, Shin = 15f, Arm = 17f,
+                RThighF = 8.0f, RShinF = 7.0f, RThighN = 8.6f, RShinN = 7.4f,
+                RArmF = 5.8f, RArmN = 5.8f } },
+            { "engineer", new RigDef {
+                HipF = new Vector2(59f, 54f), HipN = new Vector2(65f, 54f),
+                ShF  = new Vector2(56f, 82f), ShN  = new Vector2(64f, 82f),
+                Thigh = 17f, Shin = 16f, Arm = 20f,
+                RThighF = 5.0f, RShinF = 4.4f, RThighN = 5.6f, RShinN = 4.8f,
+                RArmF = 4.3f, RArmN = 4.7f } },
+
+            // Sakura: Shinobi, Yumi, Shrine are real 2-leg walkers. Kami (titan) already had a
+            // rig from before this pass -- the original reference build -- but its
+            // BuildLimbSeg branch was never written, so it fell through to the generic
+            // fallback and lost its club/fist/foot plates; see the "kami" branch below.
+            { "shinobi", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.4f, RShinF = 5.4f, RThighN = 7.0f, RShinN = 6.0f,
+                RArmF = 4.3f, RArmN = 4.7f } },
+            { "yumi", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.0f, RShinF = 5.2f, RThighN = 6.6f, RShinN = 5.6f,
+                RArmF = 4.2f, RArmN = 4.5f } },
+            { "shrine", new RigDef {
+                HipF = new Vector2(58f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 17f, Shin = 15f, Arm = 17f,
+                RThighF = 7.6f, RShinF = 6.6f, RThighN = 8.6f, RShinN = 7.4f,
+                RArmF = 5.2f, RArmN = 5.2f } },
+
+            // Solar Forge: Guardian, Raycaster, Aegis, Pyromancer are real 2-leg walkers.
+            // Colossus (titan) keeps the same hand-authored four-beat baked walk Golem uses --
+            // both were the reference builds this whole rig system generalised from, and both
+            // already read correctly (distinct per-frame joint tables, no toggle), so rigging
+            // them risks trading a bespoke "giant's gait" for a generic sine swing without
+            // fixing anything actually broken.
+            { "guardian", new RigDef {
+                HipF = new Vector2(60f, 56f), HipN = new Vector2(66f, 56f),
+                ShF  = new Vector2(56f, 84f), ShN  = new Vector2(64f, 84f),
+                Thigh = 19f, Shin = 18f, Arm = 21f,
+                RThighF = 6.6f, RShinF = 5.6f, RThighN = 7.2f, RShinN = 6.2f,
+                RArmF = 4.5f, RArmN = 4.9f } },
+            { "raycaster", new RigDef {
+                HipF = new Vector2(60f, 52f), HipN = new Vector2(66f, 52f),
+                ShF  = new Vector2(56f, 78f), ShN  = new Vector2(64f, 78f),
+                Thigh = 17f, Shin = 16f, Arm = 18f,
+                RThighF = 5.6f, RShinF = 4.8f, RThighN = 6.2f, RShinN = 5.4f,
+                RArmF = 4.2f, RArmN = 4.3f } },
+            { "aegis", new RigDef {
+                HipF = new Vector2(58f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 17f, Shin = 15f, Arm = 17f,
+                RThighF = 8.0f, RShinF = 7.0f, RThighN = 9.0f, RShinN = 7.8f,
+                RArmF = 5.4f, RArmN = 5.4f } },
+            { "pyromancer", new RigDef {
+                HipF = new Vector2(59f, 54f), HipN = new Vector2(65f, 54f),
+                ShF  = new Vector2(56f, 82f), ShN  = new Vector2(64f, 82f),
+                Thigh = 17f, Shin = 16f, Arm = 20f,
+                RThighF = 5.8f, RShinF = 5.0f, RThighN = 6.4f, RShinN = 5.6f,
+                RArmF = 4.6f, RArmN = 4.7f } },
+
+            // Dawn: only Seeker and Ward are real 2-leg walkers. Wanderer and Oracle build on
+            // this same SideJoints table but were explicitly redesigned to show a robe hem or
+            // hover rings instead of legs (Wanderer's own comment: legs peek out under a
+            // swaying cloak with no hip/thigh at all; Oracle: "hovers on visible rings of
+            // light, not on a robe hem") -- fitting either into a hip+thigh rig would fight
+            // the design, not fix a bug. Sentinel (titan) keeps Golem/Colossus/Kami's
+            // hand-authored four-beat walk for the same reason given there.
+            { "seeker", new RigDef {
+                HipF = new Vector2(60f, 52f), HipN = new Vector2(66f, 52f),
+                ShF  = new Vector2(56f, 78f), ShN  = new Vector2(64f, 78f),
+                Thigh = 17f, Shin = 16f, Arm = 18f,
+                RThighF = 5.6f, RShinF = 4.8f, RThighN = 6.2f, RShinN = 5.4f,
+                RArmF = 4.2f, RArmN = 4.3f } },
+            { "ward", new RigDef {
+                HipF = new Vector2(58f, 52f), HipN = new Vector2(64f, 52f),
+                ShF  = new Vector2(55f, 80f), ShN  = new Vector2(63f, 80f),
+                Thigh = 17f, Shin = 15f, Arm = 17f,
+                RThighF = 7.4f, RShinF = 6.4f, RThighN = 8.2f, RShinN = 7.0f,
+                RArmF = 5.4f, RArmN = 5.2f } },
         };
 
         /// <summary>True when this art id renders as a body plus rotatable limb layers.</summary>
@@ -296,9 +558,37 @@ namespace NW.App
             => Get($"rig_{id}_{(player ? 1 : 0)}_l{seg}_t{ArtThemeIdx}",
                    () => BuildLimbSeg(id, player, seg));
 
+        /// <summary>128 for themes not yet audited for the unscaled-anchor bug class this
+        /// resolution bump exposes (see BuildUnit3D), 256 once a theme's instances of it are
+        /// found and fixed.</summary>
+        static int RigR(string id) =>
+            (id.StartsWith("cyb") || id.StartsWith("syn")
+             // Biopunk
+             || id is "spore" or "mutant" or "stinger" or "crawler" or "carapace"
+                    or "swarm" or "mycelium" or "hive" or "pod"
+             // Medieval
+             || id is "pigeon" or "knight" or "siege" or "wizard" or "rogue"
+                    or "golem" or "archer" or "paladin" or "ballista"
+             // Industrial
+             || id is "rivetbot" or "worker" or "gunner" or "crane" or "bulkhead"
+                    or "ornithopter" or "engineer" or "furnace" or "gatling"
+             // Sakura
+             || id is "wisp" or "shinobi" or "yumi" or "tanuki" or "shrine"
+                    or "kite" or "onmyoji" or "kami" or "torii"
+             // Solar Forge
+             || id is "ember" or "guardian" or "raycaster" or "forgewalker" or "aegis"
+                    or "phoenix" or "pyromancer" or "colossus" or "heliostat"
+             // Dawn
+             || id is "sprite" or "wanderer" or "seeker" or "caravan" or "ward"
+                    or "glider" or "oracle" or "sentinel" or "beacon") ? 256 : 128;
+
         static Texture2D BuildLimbSeg(string id, bool player, int seg)
         {
-            const int R = 128;
+            // Matches BuildUnit3D's R so the limb layers and the body they attach to are
+            // baked at the same resolution -- a mismatch here would make the rig's seam
+            // between torso and limb visibly softer than the rest of the figure.
+            int R = RigR(id);
+            float s = R / 128f;
             var px = new Color[R * R];
             if (!_rigs.TryGetValue(id, out var r)) return MakeUnitTex(px, R);
 
@@ -308,6 +598,7 @@ namespace NW.App
             var fillL = new Vector3(0.38f, 0.08f, 0.50f).normalized;
             var p     = MakeUnitP3DP(tint, 0.32f, 0.55f);
 
+            // Joint table is authored in 128-space, same as every other builder in this file.
             Vector2 a, b; float rad; Color col;
             switch (seg)
             {
@@ -320,10 +611,868 @@ namespace NW.App
                 case 4: a = r.ShF; b = a - new Vector2(0f, r.Arm); rad = r.RArmF; col = r.ArmF; break;
                 default:a = r.ShN; b = a - new Vector2(0f, r.Arm); rad = r.RArmN; col = r.ArmN; break;
             }
-            P3DLimb(px, R, a.x, a.y, b.x, b.y, rad, col, 0.2f, 0.3f, L, H, fillL);
+
+            Vector2 V(float x, float y) => new Vector2(x * s, y * s);
+
+            bool isCyberHumanoid = id == "cybtrooper" || id == "cybsniper";
+            if (isCyberHumanoid)
+            {
+                // Team-tinted chrome, matching the same far/near material split the baked
+                // torso already uses -- a static RigDef color can't recolor per team.
+                bool far = seg == 0 || seg == 1 || seg == 4;
+                col = far ? CybChrFar(p) : (seg == 5 ? CybChr(p) : CybChrDk(p));
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+
+                if (seg == 1 || seg == 3)
+                {
+                    // Knee actuator at the TOP of the shin -- the pivot itself -- so the
+                    // exposed joint travels with the knee instead of sitting at a fixed spot.
+                    bool nearLeg = seg == 3;
+                    var farTone = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+                    CybActuator(px, R, a.x*s, a.y*s, 20f, nearLeg ? 13f : 11f, nearLeg ? 4.0f : 3.4f,
+                                nearLeg ? p : farTone, s);
+                    float fw = nearLeg ? 8f : 7f, fh = nearLeg ? 4.5f : 4f;
+                    P3DPlateLit(px, R, new[]{ V(b.x-fw,b.y+fh), V(b.x+fw+2f,b.y+fh),
+                                             V(b.x+fw,b.y-fh), V(b.x-fw-2f,b.y-fh) },
+                                nearLeg ? CybChr(p) : CybChrFar(p), nearLeg ? CybChrDk(p) : CybChrFar(p),
+                                L, H, 1.6f*s);
+                }
+                else if (seg == 5 && id == "cybtrooper")
+                {
+                    // The arm rig is a single rigid segment (no elbow sub-joint), so the
+                    // actuator is baked at the segment's visual midpoint -- it still reads as
+                    // an elbow joint even though only the shoulder actually rotates.
+                    Vector2 elbow = Vector2.Lerp(a, b, 0.52f);
+                    CybActuator(px, R, elbow.x*s, elbow.y*s, 0f, 10f, 3.4f, p, s);
+                    // Baton in the hand: short, thick shaft with a glowing edge -- a rifle
+                    // silhouette reads as a long thin barrel, this reads as a held melee
+                    // weapon. Held forward-and-up at guard, not pointed near-vertical, so it
+                    // reads as gripped rather than resting. Fixed at the idle angle; attack
+                    // poses render the full un-rigged bake and are unaffected by this.
+                    float rad2 = -40f * Mathf.Deg2Rad;
+                    float dx = -Mathf.Sin(rad2), dy = Mathf.Cos(rad2);
+                    DrawLineR(px, R, (b.x - dx*4f)*s, (b.y - dy*4f)*s, (b.x + dx*18f)*s, (b.y + dy*18f)*s,
+                              4.6f*s, CybChrDk(p));
+                    DrawLineR(px, R, (b.x + dx*8f)*s, (b.y + dy*8f)*s, (b.x + dx*18f)*s, (b.y + dy*18f)*s,
+                              2.0f*s, new Color(CybHot.r, CybHot.g, CybHot.b, 0.95f));
+                }
+                else if (seg == 5 && id == "cybsniper")
+                {
+                    // Rifle held level, forward from the hand -- reuses the same plate shape
+                    // the baked attack pose already draws, just anchored to the segment's
+                    // local hand point instead of a body-space (gx,gy). Idle/walk only; the
+                    // laser-sight windup and shot still use the full un-rigged bake.
+                    P3DPlateLit(px, R, new[]{ V(b.x-6,b.y+4), V(b.x+34,b.y+3),
+                                             V(b.x+34,b.y-3), V(b.x-6,b.y-4) },
+                                CybChrHi(p), CybChrDk(p), L, H, 1.8f*s);
+                    for (int k = 0; k < 4; k++)
+                        DrawLineR(px, R, (b.x+4f+k*8f)*s, (b.y-3.4f)*s, (b.x+4f+k*8f)*s, (b.y+3.4f)*s,
+                                  1.8f*s, new Color(CybCold.r, CybCold.g, CybCold.b, 0.30f - k*0.05f));
+                    FillCircleR(px, R, (b.x+36f)*s, b.y*s, 2.2f*s, new Color(0.92f,0.99f,1f));
+                    P3DEllipseGlow(px, R, (b.x+36f)*s, b.y*s, 7f*s, 6f*s,
+                                   new Color(CybCold.r, CybCold.g, CybCold.b, 0.30f));
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "cybshield")
+            {
+                // No far arm on this unit at all -- only the legs and the near (shield-side
+                // free) arm are real. Seg 4 bakes empty rather than drawing a limb that was
+                // never there.
+                if (seg == 4) return MakeUnitTex(px, R);
+                bool nearLeg = seg == 2 || seg == 3;
+                Color legNear = Color.Lerp(CybChrDk(p), CybChr(p), 0.35f);
+                col = seg == 5 ? CybChr(p) : (nearLeg ? legNear : CybChrFar(p));
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+
+                if (seg == 3)
+                {
+                    // Only the near knee is exposed in the baked version -- the far leg never
+                    // got an actuator, an asymmetric detail choice preserved here.
+                    CybActuator(px, R, a.x*s, a.y*s, 20f, 14f, 4.4f, p, s);
+                }
+                if (seg == 1 || seg == 3)
+                {
+                    P3DPlateLit(px, R, new[]{ V(b.x-8,b.y+4), V(b.x+9,b.y+4), V(b.x+8,b.y-5), V(b.x-7,b.y-5) },
+                                nearLeg ? legNear : CybChrDk(p), CybChrFar(p), L, H, 1.9f*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "cybtitan")
+            {
+                bool nearSide = seg == 2 || seg == 3 || seg == 5;
+                bool isArm = seg >= 4;
+                col = nearSide ? CybChrDk(p) : CybChrFar(p);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+
+                if (seg == 1 || seg == 3)
+                {
+                    // Knee actuator, matching the baked version's 25 degree tilt.
+                    var farTone = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+                    CybActuator(px, R, a.x*s, a.y*s, 25f, nearSide ? 19f : 16f, nearSide ? 5.4f : 4.6f,
+                                nearSide ? p : farTone, s);
+                    float fw = nearSide ? 12f : 10f, fhTop = nearSide ? 8f : 7f, fhBot = nearSide ? 7f : 6f;
+                    P3DPlateLit(px, R, new[]{ V(b.x-fw,b.y+fhTop), V(b.x+fw,b.y+fhTop),
+                                             V(b.x+fw-2f,b.y-fhBot), V(b.x-fw+2f,b.y-fhBot) },
+                                nearSide ? CybChr(p) : CybChrFar(p), CybChrDk(p), L, H, (nearSide?2.2f:2f)*s);
+                }
+                else if (isArm)
+                {
+                    // Near shoulder carries an exposed actuator right at the pivot (matching
+                    // the baked version); far shoulder doesn't, same far/near detail split
+                    // used everywhere else on this unit.
+                    if (nearSide) CybActuator(px, R, a.x*s, a.y*s, 0f, 14f, 4.4f, p, s);
+                    float fw = nearSide ? 10f : 8f, fh = nearSide ? 8f : 7f;
+                    P3DPlateLit(px, R, new[]{ V(b.x-fw,b.y+fh), V(b.x+fw,b.y+fh),
+                                             V(b.x+fw+1f,b.y-fh), V(b.x-fw-1f,b.y-fh) },
+                                nearSide ? CybChrHi(p) : CybChrFar(p), nearSide ? CybChr(p) : CybChrDk(p),
+                                L, H, (nearSide?2.2f:2f)*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "cybmech")
+            {
+                // No arms on this unit -- seg 4/5 bake at a near-zero radius/length from the
+                // dummy RigDef values above and are effectively invisible, so only legs 0-3
+                // need real decoration here.
+                if (seg >= 4) return MakeUnitTex(px, R);
+                bool nearLeg = seg == 2 || seg == 3;
+                float dir = nearLeg ? 1f : -1f;
+                col = nearLeg ? CybChrDk(p) : CybChrFar(p);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                {
+                    var farTone = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+                    CybActuator(px, R, a.x*s, a.y*s, dir*40f, nearLeg ? 12f : 12f, nearLeg ? 4.0f : 3.2f,
+                                nearLeg ? p : farTone, s);
+                    P3DPlateLit(px, R, new[]{ V(b.x-8,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-4), V(b.x-6,b.y-4) },
+                                CybChrDk(p), CybChrFar(p), L, H, 1.8f*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            bool isSynHumanoid = id == "synracer" || id == "synlaser" || id == "synbouncer";
+            if (isSynHumanoid)
+            {
+                // Same far/near material split the baked torso already uses. Synthwave has no
+                // exposed-actuator joint language (unlike Cyber), so there's no joint accent to
+                // add here -- just the capsule and, where the baked version has one, the foot
+                // plate or hand accessory.
+                bool far = seg == 0 || seg == 1 || seg == 4;
+                col = far ? SynChrFar(p) : (seg == 5 ? SynChr(p) : SynChrDk(p));
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+
+                if (seg == 1 || seg == 3)
+                {
+                    bool nearLeg = seg == 3;
+                    float fw = nearLeg ? 8f : 7f, fh = nearLeg ? 4.5f : 4f;
+                    P3DPlate(px, R, new[]{ V(b.x-fw,b.y+fh), V(b.x+fw+2f,b.y+fh),
+                                          V(b.x+fw,b.y-fh), V(b.x-fw-2f,b.y-fh) },
+                             nearLeg ? SynChr(p) : SynChrFar(p), nearLeg ? SynChrDk(p) : SynChrFar(p), 1.6f*s);
+                }
+                else if (seg == 5 && id == "synracer")
+                {
+                    // Weapon tube fixed at the idle angle, same idea as Lancer's baton.
+                    float rad2 = -40f * Mathf.Deg2Rad;
+                    float dx = -Mathf.Sin(rad2), dy = Mathf.Cos(rad2);
+                    SynTube(px, R, (b.x - dx*4f)*s, (b.y - dy*4f)*s,
+                                   (b.x + dx*22f)*s, (b.y + dy*22f)*s, SynMag, s);
+                }
+                else if (seg == 5 && id == "synlaser")
+                {
+                    // Rifle frame, forward from the hand -- the same shape the baked pose
+                    // draws, anchored to the segment's local hand point instead of nHx/nHy.
+                    float gx = b.x*s + 8f*s, gy = b.y*s;
+                    SynTube(px, R, gx, gy+14f*s, gx+6f*s, gy, SynCya, s);
+                    SynTube(px, R, gx+6f*s, gy, gx, gy-14f*s, SynCya, s);
+                    FillCircleR(px, R, gx+8f*s, gy, 2.6f*s, new Color(1f,0.98f,1f));
+                    P3DEllipseGlow(px, R, gx+8f*s, gy, 8f*s, 7f*s,
+                                   new Color(SynCya.r, SynCya.g, SynCya.b, 0.35f));
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "synobelisk")
+            {
+                bool nearSide = seg == 2 || seg == 3 || seg == 5;
+                bool isArm = seg >= 4;
+                col = nearSide ? SynChrDk(p) : SynChrFar(p);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.6f, 0.5f, L, H, fillL);
+
+                if (seg == 1 || seg == 3)
+                {
+                    float fw = nearSide ? 12f : 10f, fhTop = nearSide ? 8f : 7f, fhBot = nearSide ? 7f : 6f;
+                    P3DPlate(px, R, new[]{ V(b.x-fw,b.y+fhTop), V(b.x+fw,b.y+fhTop),
+                                          V(b.x+fw-2f,b.y-fhBot), V(b.x-fw+2f,b.y-fhBot) },
+                             nearSide ? SynChr(p) : SynChrFar(p), SynChrDk(p), (nearSide?2.2f:2f)*s);
+                }
+                else if (isArm)
+                {
+                    float fw = nearSide ? 10f : 8f, fh = nearSide ? 8f : 7f;
+                    P3DPlate(px, R, new[]{ V(b.x-fw,b.y+fh), V(b.x+fw,b.y+fh),
+                                          V(b.x+fw+1f,b.y-fh), V(b.x-fw-1f,b.y-fh) },
+                             nearSide ? SynChrHi(p) : SynChrFar(p), nearSide ? SynChr(p) : SynChrDk(p),
+                             (nearSide?2.2f:2f)*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "mutant")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtSteelBase(p) : ArtSteelFar(p);
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? 0.2f : 0.1f, near ? 0.4f : 0.3f, L, H, fillL);
+                    if (near)
+                        // Bone club fixed at its idle angle (sw=-8 at rest in the baked pose)
+                        // -- the live rig now supplies the swing that used to come from q.
+                        BioBone(px, R, new Vector2(b.x*s, b.y*s), -8f, 22f, s);
+                    else
+                        // Withered far hand -- just the small claw blob the baked pose ends on.
+                        FillCircleR(px, R, b.x*s, b.y*s, 2.4f*s, col);
+                    return MakeUnitTex(px, R);
+                }
+                // Digitigrade leg is 3 joints (thigh/shin/foot) in the baked pose -- one more
+                // than this rig's 2-bone leg. Shin folds the foot in as a fixed continuation
+                // reaching the same toe-tip the baked foot did (Shin's RigDef length already
+                // accounts for this); it costs the extra ankle bend, not the clawed shape.
+                col = nearLeg ? ArtSteelDk(p) : ArtSteelFar(p);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.15f : 0.1f, nearLeg ? 0.35f : 0.3f, L, H, fillL);
+                if (seg == 3)
+                    // Near foot's gold accent plate -- the baked pose only puts this on the
+                    // near foot, an asymmetric detail choice preserved here.
+                    P3DPlate(px, R, new[]{ V(b.x-3,b.y+2), V(b.x+10,b.y+2), V(b.x+8,b.y-3), V(b.x-3,b.y-3) },
+                             ArtGold, ArtGoldDk, 1.4f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "carapace")
+            {
+                if (seg == 4) return MakeUnitTex(px, R);   // no far arm -- never drawn baked either
+                bool nearLeg = seg == 2 || seg == 3;
+                if (seg == 5)
+                {
+                    col = ArtSteelBase(p);
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.2f, 0.4f, L, H, fillL);
+                    // Spike fixed at its idle angle (sp+40 = 42 at rest) -- the live rig now
+                    // supplies the swing.
+                    BioBone(px, R, new Vector2(b.x*s, b.y*s), 42f, 13f, s);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtSteelDk(p) : ArtSteelFar(p);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.15f : 0.1f, nearLeg ? 0.35f : 0.3f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-8,b.y+3), V(b.x+9,b.y+3), V(b.x+7,b.y-4), V(b.x-7,b.y-4) },
+                             nearLeg ? ArtGold : ArtGoldDk, ArtGoldDk, 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "knight")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color steelHi = ArtSteelHi(p), steel = ArtSteelBase(p), steelDk = ArtSteelDk(p), farDk = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? steel : farDk;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? p.metallic*.85f : p.metallic*.5f, near ? p.smoothness*.9f : p.smoothness*.6f, L, H, fillL);
+                    // Pauldron at the shoulder end -- baked into the segment so it travels
+                    // with the whole rigid arm, same fix the shoulder already got outside the
+                    // rig (see Pauldron() in the baked builder): it used to sit at a fixed
+                    // point while the arm swung out from under it.
+                    float sc = near ? 1.0f : 0.86f;
+                    P3DPlate(px, R, new[]{ V(a.x-11f*sc,a.y+5f*sc), V(a.x+11f*sc,a.y+5f*sc),
+                                          V(a.x+9f*sc,a.y-8f*sc), V(a.x-9f*sc,a.y-8f*sc) },
+                             near ? steelHi : steel, near ? steel : farDk, 2f*s);
+                    if (near)
+                    {
+                        // Runed greatsword fixed at its idle grip angle (-18°, the same value
+                        // the baked builder falls back to outside windup/strike/flinch) -- the
+                        // live rig now supplies the swing.
+                        Vector2 dir = RotP(new Vector2(0f,1f), Vector2.zero, -18f);
+                        Vector2 grip = new Vector2(b.x*s, b.y*s);
+                        Vector2 tip  = new Vector2(grip.x + dir.x*46f*s, grip.y + dir.y*46f*s);
+                        Vector2 gEnd = new Vector2(grip.x - dir.x*9f*s,  grip.y - dir.y*9f*s);
+                        DrawLineR(px, R, grip.x, grip.y, gEnd.x, gEnd.y, 4.4f*s, ArtLeather);
+                        FillCircleR(px, R, gEnd.x, gEnd.y, 3.4f*s, ArtGold);
+                        Vector2 perp = new Vector2(-dir.y, dir.x);
+                        DrawLineR(px, R, grip.x - perp.x*11f*s, grip.y - perp.y*11f*s,
+                                         grip.x + perp.x*11f*s, grip.y + perp.y*11f*s, 4.2f*s, ArtGold);
+                        P3DBlade(px, R, new Vector2(grip.x + dir.x*3f*s, grip.y + dir.y*3f*s), tip, 3.4f*s, steelHi, steel);
+                    }
+                    else
+                    {
+                        // Kite shield fixed on the off hand, braced straight down along the
+                        // segment's own rest axis.
+                        Vector2 gp = new Vector2(b.x*s, b.y*s);
+                        var sk = new[]{ new Vector2(-11,10), new Vector2(11,10), new Vector2(9,-8),
+                                        new Vector2(0,-17), new Vector2(-9,-8) };
+                        var skp = new Vector2[sk.Length];
+                        for (int i = 0; i < sk.Length; i++) skp[i] = new Vector2(gp.x + sk[i].x*s, gp.y + sk[i].y*s);
+                        P3DPlate(px, R, skp, steel, farDk, 2f*s);
+                        DrawLineR(px, R, skp[0].x, skp[0].y, skp[3].x, skp[3].y, 2.4f*s, ArtLivery(p));
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? steelDk : farDk;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 3)
+                {
+                    // Greave -- in the segment's own rest frame the shin hangs straight down,
+                    // so the plate that used to track the live knee-to-foot angle just sits
+                    // fixed along that axis instead (a straight-down shin has that same angle
+                    // anyway, so this is the same shape, not an approximation of it).
+                    P3DPlate(px, R, new[]{ V(a.x-6,a.y+4), V(a.x+6,a.y+4), V(a.x+5,a.y-16), V(a.x-5,a.y-16) },
+                             steelHi, steel, 1.8f*s);
+                    P3DPlate(px, R, new[]{ V(b.x-8,b.y+3), V(b.x+9,b.y+3), V(b.x+7,b.y-4), V(b.x-7,b.y-4) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f), 1.8f*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "archer")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color farDk = ArtSteelFar(p), leather = ArtLeather;
+                Color leatherDk = new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f);
+                Color cloth = ArtLivery(p);
+                Color steel = ArtSteelHi(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? cloth : farDk;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? p.metallic*.6f : p.metallic*.5f, near ? p.smoothness*.7f : p.smoothness*.6f, L, H, fillL);
+                    if (near)
+                    {
+                        // Longbow fixed at its idle draw (5, the rest-state value outside
+                        // windup/strike) -- the live rig now supplies the sway.
+                        Color wood = new Color(0.46f, 0.32f, 0.17f);
+                        Vector2 grip = Vector2.Lerp(new Vector2(b.x*s, b.y*s), V(78, 78), 0.55f);
+                        Vector2 top = new Vector2(grip.x + 4f*s, grip.y + 30f*s);
+                        Vector2 bot = new Vector2(grip.x + 4f*s, grip.y - 30f*s);
+                        DrawLineR(px, R, grip.x+9f*s, grip.y, top.x, top.y, 3.2f*s, wood);
+                        DrawLineR(px, R, grip.x+9f*s, grip.y, bot.x, bot.y, 3.2f*s, wood);
+                        Vector2 nock = new Vector2(grip.x - 5f*s, grip.y);
+                        DrawLineR(px, R, top.x, top.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
+                        DrawLineR(px, R, bot.x, bot.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
+                        DrawLineR(px, R, nock.x, nock.y, (grip.x+18f*s), grip.y, 1.6f*s, wood);
+                        P3DPlate(px, R, new[]{ new Vector2(grip.x+18f*s, grip.y+3f*s),
+                                              new Vector2(grip.x+25f*s, grip.y),
+                                              new Vector2(grip.x+18f*s, grip.y-3f*s) }, steel, farDk, 1.2f*s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? leatherDk : farDk;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.2f, 0.3f, L, H, fillL);
+                if (seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-4), V(b.x-6,b.y-4) },
+                             leather, leatherDk, 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "paladin")
+            {
+                if (seg == 4) return MakeUnitTex(px, R);   // far arm is a stub baked either way
+                bool nearLeg = seg == 2 || seg == 3;
+                Color steelHi = ArtSteelHi(p), steel = ArtSteelBase(p), steelDk = ArtSteelDk(p), farDk = ArtSteelFar(p);
+                if (seg == 5)
+                {
+                    col = steel;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, p.metallic*.85f, p.smoothness*.9f, L, H, fillL);
+                    // Mace fixed at its idle swing (4°, the rest-state value outside
+                    // windup/strike) -- the live rig now supplies the swing.
+                    Vector2 hand = new Vector2(b.x*s, b.y*s);
+                    DrawLineR(px, R, hand.x, hand.y, hand.x+4f*s, hand.y+18f*s, 3.4f*s, ArtLeather);
+                    FillCircleR(px, R, hand.x+4f*s, hand.y+18f*s, 6.4f*s, steelHi);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? steelDk : farDk;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-9,b.y+4), V(b.x+10,b.y+4), V(b.x+8,b.y-5), V(b.x-8,b.y-5) },
+                             steelDk, farDk, 1.8f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "worker")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color ironHi = ArtSteelHi(p), iron = ArtSteelBase(p), ironDk = ArtSteelDk(p), farDk = ArtSteelFar(p);
+                Color canvas = ArtCloth, canvasDk = ArtClothDk, strap = ArtLeather;
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? canvas : farDk;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.1f, near ? 0.2f : 0.6f, L, H, fillL);
+                    float sc = near ? 1.0f : 0.85f;
+                    P3DPlate(px, R, new[]{ V(a.x-10f*sc,a.y+4f*sc), V(a.x+10f*sc,a.y+4f*sc),
+                                          V(a.x+8f*sc,a.y-7f*sc), V(a.x-8f*sc,a.y-7f*sc) },
+                             near ? ironHi : iron, near ? iron : farDk, 1.8f*s);
+                    if (near)
+                    {
+                        P3DSphere(px, R, b.x*s, b.y*s, 4.2f*s, strap, 0.1f, 0.2f, L, H, fillL);
+                        // Rivet gun fixed at its idle kick (2°) -- the live rig supplies the motion.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        Vector2 muzzle = new Vector2(hand.x + 18f*s, hand.y + 2f*s);
+                        DrawLineR(px, R, hand.x, hand.y, muzzle.x, muzzle.y, 4.2f*s, iron);
+                        DrawLineR(px, R, hand.x, hand.y, muzzle.x, muzzle.y, 1.6f*s, ironHi);
+                        P3DPlate(px, R, new[]{ new Vector2(hand.x+5f*s,hand.y+5f*s), new Vector2(hand.x+13f*s,hand.y+5f*s),
+                                              new Vector2(hand.x+12f*s,hand.y+12f*s), new Vector2(hand.x+6f*s,hand.y+12f*s) },
+                                 ArtGoldHi, ArtGold, 1.4f*s);
+                        DrawLineR(px, R, hand.x-2f*s, hand.y, hand.x-2f*s, hand.y-8f*s, 3f*s, strap);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? canvasDk : farDk;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.1f, 0.2f, L, H, fillL);
+                if (seg == 3)
+                    P3DPlate(px, R, new[]{ V(a.x-6,a.y+3), V(a.x+6,a.y+3), V(a.x+5,a.y-9), V(a.x-5,a.y-9) },
+                             iron, ironDk, 1.6f*s);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-8,b.y+4), V(b.x+10,b.y+4), V(b.x+8,b.y-5), V(b.x-7,b.y-5) },
+                             ironDk, farDk, 1.8f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "gunner")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtCloth : cf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? 0.1f : p.metallic*.5f, near ? 0.2f : p.smoothness*.6f, L, H, fillL);
+                    if (near)
+                    {
+                        // Rifle fixed at its idle recoil (0) -- the live rig supplies the recoil.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        Vector2 muzzle = new Vector2(hand.x + 50f*s, hand.y + 2f*s);
+                        DrawLineR(px, R, hand.x, hand.y, muzzle.x, muzzle.y, 4.0f*s, cd);
+                        DrawLineR(px, R, hand.x, hand.y, muzzle.x, muzzle.y, 1.5f*s, ch);
+                        P3DPlate(px, R, new[]{ new Vector2(hand.x+40f*s,hand.y+6f*s), new Vector2(hand.x+54f*s,hand.y+4f*s),
+                                              new Vector2(hand.x+54f*s,hand.y-2f*s), new Vector2(hand.x+40f*s,hand.y-3f*s) },
+                                 ch, c, 1.5f*s);
+                        P3DPlate(px, R, new[]{ new Vector2(hand.x-10f*s,hand.y+5f*s), new Vector2(hand.x-2f*s,hand.y+5f*s),
+                                              new Vector2(hand.x-2f*s,hand.y-4f*s), new Vector2(hand.x-10f*s,hand.y-4f*s) },
+                                 ArtLeather, new Color(ArtLeather.r*0.5f,ArtLeather.g*0.5f,ArtLeather.b*0.5f), 1.4f*s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtClothDk : cf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.1f : p.metallic*.5f, nearLeg ? 0.2f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+9,b.y+3), V(b.x+7,b.y-5), V(b.x-6,b.y-5) },
+                             cd, cf, 1.7f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "bulkhead")
+            {
+                if (seg == 4) return MakeUnitTex(px, R);   // far arm is a stub, same as Paladin
+                Color cd2 = ArtSteelDk(p), cf2 = ArtSteelFar(p);
+                if (seg == 5)
+                {
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, ArtSteelBase(p), p.metallic, p.smoothness, L, H, fillL);
+                    // Grip strap to the shield's idle position (bx=73 at rest) -- baked onto
+                    // this segment so it travels with the arm instead of drifting, same fix
+                    // the baked builder already applies for its own hand joint.
+                    Color ch3 = ArtSteelHi(p), c3 = ArtSteelBase(p);
+                    Vector2 hand = new Vector2(b.x*s, b.y*s);
+                    DrawLineR(px, R, hand.x, hand.y, 60f*s, 58f*s, 3.4f*s, ArtSteelDk(p));
+                    P3DPlate(px, R, new[]{ V(56,54), V(65,54), V(64,62), V(57,62) }, ch3, c3, 1.5f*s);
+                    return MakeUnitTex(px, R);
+                }
+                // Pistons baked at rest (ext=0) -- the live rig supplies the leg swing, the
+                // attack-only piston-extend flourish drops, same tradeoff as every other rigged
+                // weapon prop.
+                IndPiston(px, R, a.x, a.y, b.x, b.y, rad, p, 0f, L, H, fillL, s);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-9,b.y+4), V(b.x+10,b.y+4), V(b.x+8,b.y-5), V(b.x-8,b.y-5) },
+                             cd2, cf2, 1.8f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "engineer")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color ch2 = ArtSteelHi(p), cf2b = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtCloth : cf2b;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? 0.1f : p.metallic*.4f, near ? 0.2f : p.smoothness*.5f, L, H, fillL);
+                    if (near)
+                    {
+                        // Arc-wand fixed at its idle lift (-4°) -- the live rig supplies the sway.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        Vector2 d = RotP(new Vector2(0f,1f), Vector2.zero, -4f);
+                        Vector2 top = new Vector2(hand.x + d.x*40f*s, hand.y + d.y*40f*s);
+                        DrawLineR(px, R, hand.x - d.x*10f*s, hand.y - d.y*10f*s, top.x, top.y, 3.0f*s, ArtLeather);
+                        for (int k = 0; k < 5; k++)
+                        {
+                            float t = k/4f;
+                            DrawRingR(px, R, hand.x + (top.x-hand.x)*(0.55f+t*0.36f), hand.y + (top.y-hand.y)*(0.55f+t*0.36f),
+                                      (5.4f-k*0.7f)*s, 1.5f*s, ArtGold);
+                        }
+                        FillCircleR(px, R, top.x, top.y, 4.4f*s, ch2);
+                        FillCircleR(px, R, top.x, top.y, 2.2f*s, new Color(0.7f,0.9f,1f));
+                        P3DEllipseGlow(px, R, top.x, top.y, 8f*s, 8f*s, new Color(0.5f,0.8f,1f,0.3f));
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtClothDk : cf2b;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.1f : p.metallic*.4f, nearLeg ? 0.2f : p.smoothness*.5f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-5), V(b.x-6,b.y-5) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "shinobi")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color mf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? SakLac(p) : mf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? p.metallic : p.metallic*.5f, near ? p.smoothness : p.smoothness*.6f, L, H, fillL);
+                    if (near)
+                    {
+                        // Katana fixed at its idle sway (-16°) -- the live rig supplies the swing.
+                        Vector2 grip = new Vector2(b.x*s, b.y*s);
+                        Vector2 d = RotP(new Vector2(0f,1f), Vector2.zero, -16f);
+                        Vector2 tip = new Vector2(grip.x + d.x*40f*s, grip.y + d.y*40f*s);
+                        Vector2 btm = new Vector2(grip.x - d.x*24f*s, grip.y - d.y*24f*s);
+                        DrawLineR(px, R, btm.x, btm.y, tip.x, tip.y, 3.0f*s, ArtLeather);
+                        DrawLineR(px, R, btm.x, btm.y, tip.x, tip.y, 1.2f*s,
+                                  new Color(ArtLeather.r*1.7f, ArtLeather.g*1.7f, ArtLeather.b*1.7f));
+                        Vector2 pp = new Vector2(-d.y, d.x);
+                        P3DPlate(px, R, new[]{
+                            new Vector2(tip.x+pp.x*2.4f*s, tip.y+pp.y*2.4f*s),
+                            new Vector2(tip.x+d.x*13f*s+pp.x*8f*s, tip.y+d.y*13f*s+pp.y*8f*s),
+                            new Vector2(tip.x+d.x*24f*s+pp.x*1f*s, tip.y+d.y*24f*s+pp.y*1f*s),
+                            new Vector2(tip.x+d.x*11f*s-pp.x*2f*s, tip.y+d.y*11f*s-pp.y*2f*s) },
+                            new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.7f*s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? SakLacDk(p) : mf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                {
+                    Color fp1 = nearLeg ? SakPaper : SakPaperDk;
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+9,b.y+3), V(b.x+8,b.y-3), V(b.x-6,b.y-3) },
+                             fp1, SakPaperDk, 1.5f*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "yumi")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color mf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? SakPaperDk : mf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? 0.1f : p.metallic*.5f, near ? 0.2f : p.smoothness*.6f, L, H, fillL);
+                    if (near)
+                    {
+                        // Yumi bow fixed at its idle draw (5) -- the live rig supplies the sway.
+                        // Gripped a third from the bottom, so the limbs are wildly unequal --
+                        // the baked builder's own read.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        float gx = hand.x/s + 6f, gy = hand.y/s;
+                        DrawLineR(px, R, gx*s,gy*s, (gx-3f)*s,(gy-26f)*s, 2.6f*s, ArtLeather);
+                        DrawLineR(px, R, gx*s,gy*s, (gx-4f)*s,(gy+50f)*s, 2.6f*s, ArtLeather);
+                        DrawLineR(px, R, (gx-3f)*s,(gy-26f)*s, (gx+1f)*s,(gy-32f)*s, 2.2f*s, ArtLeather);
+                        DrawLineR(px, R, (gx-4f)*s,(gy+50f)*s, (gx+1f)*s,(gy+58f)*s, 2.2f*s, ArtLeather);
+                        float nx = gx - 5f, ny = gy + 8f;
+                        var str = new Color(0.92f,0.90f,0.84f);
+                        DrawLineR(px, R, (gx+1f)*s,(gy-32f)*s, nx*s,ny*s, 1.2f*s, str);
+                        DrawLineR(px, R, (gx+1f)*s,(gy+58f)*s, nx*s,ny*s, 1.2f*s, str);
+                        DrawLineR(px, R, nx*s,ny*s, (gx+16f)*s,(gy+8f)*s, 1.5f*s, ArtLeather);
+                        P3DPlate(px, R, new[]{ V(gx+16,gy+11), V(gx+24,gy+8), V(gx+16,gy+5) },
+                                 new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.2f*s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtClothDk : mf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.1f : p.metallic*.5f, nearLeg ? 0.2f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                {
+                    Color fp1 = nearLeg ? SakPaper : SakPaperDk;
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+9,b.y+3), V(b.x+8,b.y-3), V(b.x-6,b.y-3) },
+                             fp1, SakPaperDk, 1.5f*s);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "shrine")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color mf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, seg == 5 ? SakLac(p) : mf,
+                            seg == 5 ? p.metallic : p.metallic*.5f, seg == 5 ? p.smoothness : p.smoothness*.6f, L, H, fillL);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? SakLacDk(p) : mf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-8,b.y+4), V(b.x+9,b.y+4), V(b.x+8,b.y-4), V(b.x-7,b.y-4) },
+                             SakPaperDk, new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f), 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "kami")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? new Color(0.60f,0.24f,0.22f) : new Color(0.50f,0.20f,0.18f);
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.2f, 0.3f, L, H, fillL);
+                    if (near)
+                    {
+                        // Studded club fixed at its idle swing (-14°) -- the live rig supplies
+                        // the swing. This used to stay fixed to a static idle-pose (fex,ey)
+                        // point on the BODY layer while the arm swung independently on its own
+                        // live rig segment -- club and fist visibly parting ways mid-swing.
+                        // Baking it onto the arm segment itself fixes that for good.
+                        Color md = ArtSteelDk(p), mh = ArtSteelHi(p);
+                        Vector2 grip = new Vector2(b.x*s, b.y*s);
+                        Vector2 d = RotP(new Vector2(0f,1f), Vector2.zero, -14f);
+                        Vector2 tip = new Vector2(grip.x + d.x*30f*s, grip.y + d.y*30f*s);
+                        DrawLineR(px, R, grip.x, grip.y, tip.x, tip.y, 7.0f*s, md);
+                        DrawLineR(px, R, grip.x, grip.y, tip.x, tip.y, 2.6f*s, mh);
+                        for (int s2 = 0; s2 < 5; s2++)
+                        {
+                            float t2 = (s2+1)/6f;
+                            Vector2 bp = Vector2.Lerp(grip, tip, t2);
+                            FillCircleR(px, R, bp.x-4f*s, bp.y+2f*s, 2.0f*s, mh);
+                            FillCircleR(px, R, bp.x+4f*s, bp.y-2f*s, 2.0f*s, mh);
+                        }
+                    }
+                    else
+                    {
+                        FillCircleR(px, R, b.x*s-4f*s, b.y*s, 7.4f*s, col);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? new Color(0.55f,0.22f,0.20f) : new Color(0.34f,0.13f,0.12f);
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.2f, 0.3f, L, H, fillL);
+                Color fp1 = nearLeg ? SakPaperDk : new Color(SakPaperDk.r*0.62f,SakPaperDk.g*0.62f,SakPaperDk.b*0.62f);
+                Color fp2 = nearLeg ? new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f)
+                                     : new Color(SakPaperDk.r*0.42f,SakPaperDk.g*0.42f,SakPaperDk.b*0.42f);
+                float fw = nearLeg ? 12f : 10f, fhTop = nearLeg ? 8f : 7f, fhBot = nearLeg ? 7f : 6f;
+                P3DPlate(px, R, new[]{ V(b.x-fw,b.y+fhTop), V(b.x+fw,b.y+fhTop),
+                                      V(b.x+fw-2f,b.y-fhBot), V(b.x-fw+2f,b.y-fhBot) }, fp1, fp2, (nearLeg?2.2f:2f)*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "guardian")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color gb = ArtSteelBase(p), gbh = ArtSteelHi(p), gbf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? gb : gbf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? p.metallic*.85f : p.metallic*.5f, near ? p.smoothness*.9f : p.smoothness*.6f, L, H, fillL);
+                    // Shoulder guard baked at the shoulder end, same fix as Knight's pauldron.
+                    float sc = near ? 1.0f : 0.85f;
+                    P3DPlate(px, R, new[]{ V(a.x-10f*sc,a.y+5f*sc), V(a.x+10f*sc,a.y+5f*sc),
+                                          V(a.x+8f*sc,a.y-8f*sc), V(a.x-8f*sc,a.y-8f*sc) },
+                             near ? gbh : gb, near ? gb : gbf, 1.9f*s);
+                    if (near)
+                        // Glaive fixed at its idle swing (-14°) -- the live rig supplies it.
+                        SolGlaive(px, R, new Vector2(b.x*s, b.y*s), -14f, p, s);
+                    else
+                        SolSunDisc(px, R, b.x+2f, b.y, p, 0.52f, s);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtSteelDk(p) : gbf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 3)
+                    P3DPlate(px, R, new[]{ V(a.x-6,a.y+4), V(a.x+6,a.y+4), V(a.x+5,a.y-15), V(a.x-5,a.y-15) },
+                             gbh, gb, 1.8f*s);
+                if (seg == 1 || seg == 3)
+                {
+                    Color sole = nearLeg ? ArtLeather : new Color(ArtLeather.r*0.6f, ArtLeather.g*0.6f, ArtLeather.b*0.6f);
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+9,b.y+3), V(b.x+7,b.y-3), V(b.x-6,b.y-3) },
+                             sole, new Color(ArtLeather.r*0.4f, ArtLeather.g*0.4f, ArtLeather.b*0.4f), 1.6f*s);
+                    DrawLineR(px, R, b.x-4f*s, b.y+4f*s, b.x+5f*s, b.y+7f*s, 1.3f*s, ArtGold);
+                }
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "raycaster")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color rb = ArtSteelBase(p), rbf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtCloth : rbf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            near ? p.metallic*.4f : p.metallic*.5f, near ? p.smoothness*.5f : p.smoothness*.6f, L, H, fillL);
+                    if (near)
+                        // Lens tube fixed at its idle angle (34°) -- the live rig supplies the aim.
+                        SolLensTube(px, R, b.x-2f, b.y, 34f, p, false, s);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtLeather : rbf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.15f : p.metallic*.5f, nearLeg ? 0.25f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-4), V(b.x-6,b.y-4) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f*s);
+                if (seg == 3)
+                    P3DPlate(px, R, new[]{ V(a.x-6,a.y+5), V(a.x+6,a.y+5), V(a.x+5,a.y-5), V(a.x-5,a.y-5) },
+                             ArtSteelHi(p), rb, 1.5f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "aegis")
+            {
+                if (seg == 4) return MakeUnitTex(px, R);   // far arm is a stub, same as Paladin
+                bool nearLeg = seg == 2 || seg == 3;
+                Color ab = ArtSteelBase(p), abd = ArtSteelDk(p), abf = ArtSteelFar(p);
+                if (seg == 5)
+                {
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, ab, p.metallic*.85f, p.smoothness*.9f, L, H, fillL);
+                    // Ornament fixed at its idle swing (3°) -- the live rig supplies the swing.
+                    Vector2 hand = new Vector2(b.x*s, b.y*s);
+                    DrawLineR(px, R, hand.x, hand.y, hand.x+3f*s, hand.y+16f*s, 3.0f*s, ArtLeather);
+                    P3DPlate(px, R, new[]{ new Vector2(hand.x, hand.y+16f*s), new Vector2(hand.x+6f*s, hand.y+16f*s),
+                                          new Vector2(hand.x+10f*s, hand.y+23f*s), new Vector2(hand.x+4f*s, hand.y+22f*s) },
+                             ArtGoldHi, ArtGold, 1.4f*s);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? abd : abf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? p.metallic*.8f : p.metallic*.5f, nearLeg ? p.smoothness*.8f : p.smoothness*.6f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-9,b.y+4), V(b.x+10,b.y+4), V(b.x+8,b.y-5), V(b.x-8,b.y-5) },
+                             abd, abf, 1.8f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "pyromancer")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color pbf = ArtSteelFar(p);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtCloth : pbf;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                            p.metallic*.4f, p.smoothness*.5f, L, H, fillL);
+                    if (near)
+                    {
+                        // Censer chain fixed at its idle swing (arc=8) -- the live rig supplies it.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        float ax = b.x + 8f, ay = b.y - 14f;
+                        for (int ch = 0; ch < 4; ch++)
+                            FillCircleR(px, R, hand.x + (ax*s - hand.x)*(ch/4f), hand.y + (ay*s - hand.y)*(ch/4f),
+                                        1.3f*s, ArtGold);
+                        SolCenser(px, R, ax, ay + 8f, p, 0f, s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtLeather : pbf;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col,
+                        nearLeg ? 0.15f : p.metallic*.4f, nearLeg ? 0.25f : p.smoothness*.5f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-4), V(b.x-6,b.y-4) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "seeker")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color linenSh = new Color(ArtClothDk.r*0.7f, ArtClothDk.g*0.7f, ArtClothDk.b*0.7f);
+                if (seg >= 4)
+                {
+                    bool near = seg == 5;
+                    col = near ? ArtCloth : linenSh;
+                    P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.05f, 0.2f, L, H, fillL);
+                    if (near)
+                    {
+                        // Bow fixed at its idle draw (6) -- the live rig supplies the sway.
+                        Vector2 hand = new Vector2(b.x*s, b.y*s);
+                        float gx = hand.x/s + 9f, gy = hand.y/s;
+                        DawnCord(px, R, gx+3f, gy-30f, gx+3f, gy+30f, 6, ArtLeather, s);
+                        float nx = gx - 6f;
+                        var lightStr = new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.9f);
+                        DrawLineR(px, R, (gx+3f)*s, (gy+30f)*s, nx*s, gy*s, 1.4f*s, lightStr);
+                        DrawLineR(px, R, (gx+3f)*s, (gy-30f)*s, nx*s, gy*s, 1.4f*s, lightStr);
+                        P3DEllipseGlow(px, R, (gx+3f)*s, (gy+30f)*s, 7f*s, 7f*s, new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.5f));
+                        P3DEllipseGlow(px, R, (gx+3f)*s, (gy-30f)*s, 7f*s, 7f*s, new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.5f));
+                        DrawLineR(px, R, nx*s, gy*s, (gx+16f)*s, gy*s, 1.6f*s, new Color(1f,0.98f,0.9f,0.8f));
+                        DawnLight(px, R, gx+18f, gy, 2.6f, 0.8f, s);
+                    }
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtLeather : linenSh;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.05f, 0.2f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-7,b.y+3), V(b.x+8,b.y+3), V(b.x+6,b.y-4), V(b.x-6,b.y-4) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            if (id == "ward")
+            {
+                bool nearLeg = seg == 2 || seg == 3;
+                Color linenSh = new Color(ArtClothDk.r*0.7f, ArtClothDk.g*0.7f, ArtClothDk.b*0.7f);
+                if (seg >= 4)
+                {
+                    if (seg == 5)
+                        P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, ArtCloth, 0.05f, 0.2f, L, H, fillL);
+                    else
+                        P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, linenSh, 0.05f, 0.2f, L, H, fillL);
+                    return MakeUnitTex(px, R);
+                }
+                col = nearLeg ? ArtLeather : linenSh;
+                P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.05f, 0.2f, L, H, fillL);
+                if (seg == 1 || seg == 3)
+                    P3DPlate(px, R, new[]{ V(b.x-8,b.y+4), V(b.x+9,b.y+4), V(b.x+7,b.y-5), V(b.x-7,b.y-5) },
+                             ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.7f*s);
+                return MakeUnitTex(px, R);
+            }
+
+            P3DLimb(px, R, a.x*s, a.y*s, b.x*s, b.y*s, rad*s, col, 0.2f, 0.3f, L, H, fillL);
 
             // shins carry the foot, arms carry the hand
-            Vector2 V(float x, float y) => new Vector2(x, y);
             if (seg == 1 || seg == 3)
             {
                 float w = seg == 3 ? 12f : 10f, h = seg == 3 ? 8f : 7f;
@@ -331,13 +1480,150 @@ namespace NW.App
                 var bot = new Color(SakPaperDk.r * 0.42f, SakPaperDk.g * 0.42f, SakPaperDk.b * 0.42f);
                 P3DPlate(px, R, new[]{ V(b.x - w, b.y + h), V(b.x + w, b.y + h),
                                        V(b.x + w * 0.78f, b.y - h * 0.85f), V(b.x - w * 0.78f, b.y - h * 0.85f) },
-                         top, bot, 2f);
+                         top, bot, 2f*s);
             }
             else if (seg >= 4)
             {
-                FillCircleR(px, R, b.x, b.y - 4f, seg == 5 ? 8.2f : 7.4f,
+                FillCircleR(px, R, b.x*s, (b.y - 4f)*s, (seg == 5 ? 8.2f : 7.4f)*s,
                             seg == 5 ? new Color(0.62f, 0.26f, 0.24f) : new Color(0.55f, 0.22f, 0.20f));
             }
+            return MakeUnitTex(px, R);
+        }
+
+        // ── rotor rig: continuous spin instead of a couple of fixed blade-angle poses ──────
+        // Same split idea as the limb rig (body layer + separately-baked moving layer, rotated
+        // live by the view), just for a part that spins in place rather than a jointed limb.
+
+        /// <summary>True when this art id has a separately-baked, continuously-spinnable rotor.</summary>
+        public static bool HasRotorRig(string id) => id == "cybdrone";
+
+        public static Texture2D UnitNoRotor(string id, bool player)
+            => Get($"rotor_{id}_{(player ? 1 : 0)}_body_t{ArtThemeIdx}",
+                   () => BuildUnit3D(id, player, 3, 0));
+
+        /// <summary>One hub's blade pair, baked at its actual hub position on a full-size
+        /// canvas so the pivot alone (the hub's own point, no offset math needed by the
+        /// caller) places it -- side 0 = left/far hub, 1 = right/near hub.</summary>
+        public static Texture2D UnitRotor(string id, bool player, int side)
+            => Get($"rotor_{id}_{(player ? 1 : 0)}_r{side}_t{ArtThemeIdx}",
+                   () => BuildDroneRotorTex(side));
+
+        /// <summary>Hub position for UnitRotor, in 0..1 of the canvas -- what a view uses as
+        /// the RectTransform pivot so the spin has the right centre.</summary>
+        public static Vector2 RotorHub01(int side) => new Vector2((64f + (side == 0 ? -20f : 20f)) / 128f, 76f / 128f);
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  MULTI-LEG RIG (Stinger, Crawler, Hive) -- the 2-leg humanoid rig above,
+        //  generalized to N legs. Each rig segment draws whichever legs always
+        //  shared one phase in the old baked 4-pose sweep (a near+far depth pair,
+        //  or -- for Hive's diagonal trot -- one independent leg) as ONE texture,
+        //  rotated live from its own hip pivot instead of swapping between four
+        //  baked whole-body frames. Same tradeoff as the humanoid rig: attacks
+        //  (these three are sniper/mech/titan roles, so windup/strike/flinch)
+        //  stay on the baked path -- only the walk cycle is live here.
+        // ══════════════════════════════════════════════════════════════════════
+
+        /// <summary>True when this art id walks on more than two legs and has a live
+        /// multi-leg rig (as opposed to the 2-leg humanoid rig above).</summary>
+        public static bool HasMultiLegRig(string id) => id is "stinger" or "crawler" or "hive";
+
+        /// <summary>Stinger: front+back pair. Crawler: front/mid/back tripod row (each still a
+        /// near+far pair, since those always shared one phase). Hive: 4 independent legs --
+        /// its old sweep already moved diagonal pairs together (a real trot, not a front/back
+        /// split), which a 2-segment rig can't reproduce without either merging non-diagonal
+        /// legs or losing the alternation, so it gets one segment per leg instead.</summary>
+        public static int MultiLegSegCount(string id) => id switch
+        {
+            "crawler" => 3,
+            "hive"    => 4,
+            "stinger" => 2,
+            _         => 0,
+        };
+
+        static readonly Dictionary<string, Vector2[]> _legHips = new Dictionary<string, Vector2[]>
+        {
+            // hip anchor per segment, 128-space -- the RectTransform pivot for that segment.
+            ["stinger"] = new[] { new Vector2(59, 52), new Vector2(67, 52) },
+            ["crawler"] = new[] { new Vector2(51, 43), new Vector2(64, 43), new Vector2(77, 43) },
+            ["hive"]    = new[] { new Vector2(52, 52), new Vector2(58, 50), new Vector2(70, 50), new Vector2(76, 52) },
+        };
+
+        /// <summary>Hip pivot for a multi-leg segment, in 0..1 of the canvas.</summary>
+        public static Vector2 MultiLegHip01(string id, int seg)
+            => _legHips.TryGetValue(id, out var hips) && seg < hips.Length ? hips[seg] / 128f : new Vector2(0.5f, 0.5f);
+
+        /// <summary>The body with every rigged leg removed.</summary>
+        public static Texture2D UnitNoMultiLegs(string id, bool player)
+            => Get($"mleg_{id}_{(player ? 1 : 0)}_body_t{ArtThemeIdx}",
+                   () => BuildUnit3D(id, player, 3, 0));
+
+        /// <summary>One leg-group segment, hanging at rest from its hip.</summary>
+        public static Texture2D UnitMultiLeg(string id, bool player, int seg)
+            => Get($"mleg_{id}_{(player ? 1 : 0)}_l{seg}_t{ArtThemeIdx}",
+                   () => BuildMultiLegSeg(id, player, seg));
+
+        static Texture2D BuildMultiLegSeg(string id, bool player, int seg)
+        {
+            int R = RigR(id);
+            float s = R / 128f;
+            var px = new Color[R * R];
+
+            var tint  = player ? new Color(0.78f, 0.93f, 1.00f) : new Color(1.00f, 0.65f, 0.52f);
+            var L     = new Vector3(-0.45f, 0.70f, 0.55f).normalized;
+            var H     = (L + Vector3.forward).normalized;
+            var fillL = new Vector3(0.38f, 0.08f, 0.50f).normalized;
+            var p     = MakeUnitP3DP(tint, 0.32f, 0.55f);
+            Color cf = ArtSteelFar(p), cd = ArtSteelDk(p);
+
+            // Coordinates match the baked builders' own rest position (their st/t/ti == 0
+            // case) exactly, just with the sweep offset removed -- the live rig supplies the
+            // sweep now, the same handoff every 2-leg rigged weapon prop already made.
+            switch (id)
+            {
+                case "stinger":
+                    if (seg == 0)
+                    {
+                        BioSegLeg(px,R, 58f,52f, new[]{ new Vector2(46f,40f), new Vector2(40f,20f) }, 3.4f, cf, s, L,H,fillL);
+                        BioSegLeg(px,R, 60f,52f, new[]{ new Vector2(52f,36f), new Vector2(48f,19f) }, 3.8f, cf, s, L,H,fillL);
+                    }
+                    else
+                    {
+                        BioSegLeg(px,R, 66f,52f, new[]{ new Vector2(76f,38f), new Vector2(82f,20f) }, 4.0f, cd, s, L,H,fillL);
+                        BioSegLeg(px,R, 68f,52f, new[]{ new Vector2(80f,44f), new Vector2(88f,22f) }, 3.6f, cd, s, L,H,fillL);
+                    }
+                    break;
+
+                case "crawler":
+                {
+                    float bxN = 48f + seg * 13f, bxF = 54f + seg * 13f;
+                    BioSegLeg(px,R, bxN,44f, new[]{ new Vector2(bxN-11f,30f), new Vector2(bxN-16f,18f) }, 3.2f, cf, s, L,H,fillL);
+                    BioSegLeg(px,R, bxF,42f, new[]{ new Vector2(bxF+12f,30f), new Vector2(bxF+17f,18f) }, 3.8f, cd, s, L,H,fillL);
+                    break;
+                }
+
+                case "hive":
+                    switch (seg)
+                    {
+                        case 0: BioSegLeg(px,R, 52f,52f, new[]{ new Vector2(40,34), new Vector2(34,18) }, 6.0f, cf, s, L,H,fillL); break;
+                        case 1: BioSegLeg(px,R, 58f,50f, new[]{ new Vector2(46,32), new Vector2(42,18) }, 6.6f, cf, s, L,H,fillL); break;
+                        case 2: BioSegLeg(px,R, 70f,50f, new[]{ new Vector2(82,32), new Vector2(88,18) }, 7.0f, cd, s, L,H,fillL); break;
+                        default:BioSegLeg(px,R, 76f,52f, new[]{ new Vector2(88,34), new Vector2(94,18) }, 6.4f, cd, s, L,H,fillL); break;
+                    }
+                    break;
+            }
+            return MakeUnitTex(px, R);
+        }
+
+        static Texture2D BuildDroneRotorTex(int side)
+        {
+            const int R = 256;
+            var px = new Color[R * R];
+            float s = R / 128f;
+            var L = new Vector3(-0.45f, 0.70f, 0.55f).normalized;
+            var H = (L + Vector3.forward).normalized;
+            float ax = 64f + (side == 0 ? -20f : 20f), ay = 76f;
+            CybRotorBlade(px, R, ax, ay, 0f,   11f, 2.1f, CybCold, s, L, H);
+            CybRotorBlade(px, R, ax, ay, 180f, 11f, 2.1f, CybCold, s, L, H);
             return MakeUnitTex(px, R);
         }
 
@@ -1473,9 +2759,21 @@ namespace NW.App
 
         static Texture2D BuildUnit3D(string id, bool player, int part = 0, int pose = 0)
         {
-            // Rasterize at the resolution the builders were authored for (s = R/128 = 1).
-            // At 64 every feature landed on half-pixels — heads were 8px blobs.
-            const int R = 128;
+            // Rasterize at 2x the resolution the builders were authored for (s = R/128 = 2).
+            // Every coordinate in every builder is already written as *s, so this falls out
+            // of the existing math for free -- no builder needed to change. Battlefield rects
+            // display units at ~30px (already a 128->30 downsample, so this is a no-op there),
+            // but the troop-info modal's hero icon and the pilot/skin previews show units at
+            // ~150-220px -- a 128->150+ UPSCALE that was softening every outline and gradient.
+            // At 256 that becomes a downscale instead, which is what actually reads as crisp.
+            //
+            // Cyber and Synthwave only for now: bumping R exposed a pre-existing bug in
+            // several builders (across multiple themes) that used a raw joint coordinate as
+            // an anchor point with only the offset multiplied by s -- invisible at s=1
+            // (R=128, where "x" and "x*s" are identical), but a real mispositioning once
+            // s != 1. Both themes' instances are found and fixed; the other 6 themes haven't
+            // been audited yet, so this stays scoped until they have.
+            int R = RigR(id);
             var px = new Color[R * R];
 
             Color tint = player ? new Color(0.78f, 0.93f, 1.00f) : new Color(1.00f, 0.65f, 0.52f);
@@ -1490,8 +2788,18 @@ namespace NW.App
             if (part == 2 && !HasWeaponPart(id))
                 return MakeUnitTex(px, R);
 
+            // This shadow's Y and radii were never wrapped in *s -- harmless while every
+            // theme baked at R=128 (s=1, so "6f" and "6f*s" were identical), but a real bug
+            // once Cyber's R became 256: the shadow stayed pinned near the very bottom of a
+            // canvas that now draws the character twice as large, so every Cyber unit's feet
+            // sat visibly above its own shadow -- the "floating on water" look, worst on a
+            // unit standing still (Sentry) where there's no walk motion to distract from it.
             if (part != 2)
-                P3DEllipseGlow(px, R, R / 2f, 6f, 20f, 4f, new Color(0f, 0f, 0f, 0.45f));
+            {
+                float shadowS = R / 128f;
+                P3DEllipseGlow(px, R, R / 2f, 6f * shadowS, 20f * shadowS, 4f * shadowS,
+                               new Color(0f, 0f, 0f, 0.45f));
+            }
 
             switch (id)
             {
@@ -1504,7 +2812,7 @@ namespace NW.App
                 case "seeker":
                     P3DBuildSeeker    (px, R, p, L, H, fillL, part, pose); break;
                 case "ward":
-                    P3DBuildWard      (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildWard      (px, R, p, L, H, fillL, part, pose); break;
                 case "caravan":
                     P3DBuildCaravan   (px, R, p, L, H, fillL, part, pose); break;
                 case "glider":
@@ -1528,15 +2836,15 @@ namespace NW.App
 
                 // ---- CYBER: cold composite, exposed mechanism ----
                 case "cybdrone":
-                    P3DBuildCybDrone    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildCybDrone    (px, R, p, L, H, fillL, part, pose); break;
                 case "cybtrooper":
-                    P3DBuildCybTrooper  (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildCybTrooper  (px, R, p, L, H, fillL, part, pose); break;
                 case "cybsniper":
-                    P3DBuildCybSniper   (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildCybSniper   (px, R, p, L, H, fillL, part, pose); break;
                 case "cybmech":
                     P3DBuildCybMech     (px, R, p, L, H, fillL, part, pose); break;
                 case "cybshield":
-                    P3DBuildCybShield   (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildCybShield   (px, R, p, L, H, fillL, part, pose); break;
                 case "cybinter":
                     P3DBuildCybInter    (px, R, p, L, H, fillL, pose); break;
                 case "cybhacker":
@@ -1550,13 +2858,13 @@ namespace NW.App
                 case "synbot":
                     P3DBuildSynBot      (px, R, p, L, H, fillL, pose); break;
                 case "synracer":
-                    P3DBuildSynRacer    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildSynRacer    (px, R, p, L, H, fillL, part, pose); break;
                 case "synlaser":
-                    P3DBuildSynLaser    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildSynLaser    (px, R, p, L, H, fillL, part, pose); break;
                 case "syncruiser":
                     P3DBuildSynCruiser  (px, R, p, L, H, fillL, part, pose); break;
                 case "synbouncer":
-                    P3DBuildSynBouncer  (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildSynBouncer  (px, R, p, L, H, fillL, part, pose); break;
                 case "synspeeder":
                     P3DBuildSynSpeeder  (px, R, p, L, H, fillL, pose); break;
                 case "synkeytar":
@@ -1570,11 +2878,11 @@ namespace NW.App
                 case "wisp":
                     P3DBuildWisp        (px, R, p, L, H, fillL, pose); break;
                 case "shinobi":
-                    P3DBuildShinobi     (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildShinobi     (px, R, p, L, H, fillL, part, pose); break;
                 case "yumi":
                     P3DBuildYumi        (px, R, p, L, H, fillL, part, pose); break;
                 case "shrine":
-                    P3DBuildShrineGuard (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildShrineGuard (px, R, p, L, H, fillL, part, pose); break;
                 case "tanuki":
                     P3DBuildTanuki      (px, R, p, L, H, fillL, part, pose); break;
                 case "kite":
@@ -1590,13 +2898,13 @@ namespace NW.App
                 case "spore":
                     P3DBuildSpore     (px, R, p, L, H, fillL, pose); break;
                 case "mutant":
-                    P3DBuildMutant    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildMutant    (px, R, p, L, H, fillL, part, pose); break;
                 case "stinger":
                     P3DBuildStinger   (px, R, p, L, H, fillL, part, pose); break;
                 case "crawler":
                     P3DBuildCrawler   (px, R, p, L, H, fillL, part, pose); break;
                 case "carapace":
-                    P3DBuildCarapace  (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildCarapace  (px, R, p, L, H, fillL, part, pose); break;
                 case "swarm":
                     P3DBuildSwarm     (px, R, p, L, H, fillL, pose); break;
                 case "mycelium":
@@ -1608,30 +2916,30 @@ namespace NW.App
                 case "trooper": case "racer":
                     P3DBuildTrooper (px, R, p, L, H, fillL, pose); break;
                 case "knight":
-                    P3DBuildKnight  (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildKnight  (px, R, p, L, H, fillL, part, pose); break;
 
                 // ---- SOLAR FORGE: own geometry, six wired; three still aliased below ----
                 case "guardian":
-                    P3DBuildGuardian   (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildGuardian   (px, R, p, L, H, fillL, part, pose); break;
                 case "raycaster":
                     P3DBuildRaycaster  (px, R, p, L, H, fillL, part, pose); break;
                 case "aegis":
-                    P3DBuildAegis      (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildAegis      (px, R, p, L, H, fillL, part, pose); break;
                 case "forgewalker":
                     P3DBuildForgewalker(px, R, p, L, H, fillL, part, pose); break;
                 case "phoenix":
                     P3DBuildPhoenix    (px, R, p, L, H, fillL, pose); break;
                 case "pyromancer":
-                    P3DBuildPyromancer (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildPyromancer (px, R, p, L, H, fillL, part, pose); break;
                 // ---- INDUSTRIAL: riveted, stamped, badly repaired ----
                 case "worker":
-                    P3DBuildWorker      (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildWorker      (px, R, p, L, H, fillL, part, pose); break;
                 case "rivetbot":
                     P3DBuildRivetbot    (px, R, p, L, H, fillL, pose); break;
                 case "gunner":
                     P3DBuildGunner      (px, R, p, L, H, fillL, part, pose); break;
                 case "bulkhead":
-                    P3DBuildBulkhead    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildBulkhead    (px, R, p, L, H, fillL, part, pose); break;
                 case "crane":
                     P3DBuildCrane       (px, R, p, L, H, fillL, part, pose); break;
                 case "furnace":
@@ -1639,7 +2947,7 @@ namespace NW.App
                 case "ornithopter":
                     P3DBuildOrnithopter (px, R, p, L, H, fillL, pose); break;
                 case "engineer":
-                    P3DBuildEngineer    (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildEngineer    (px, R, p, L, H, fillL, part, pose); break;
                 case "gatling":
                     P3DBuildGatling     (px, R, p, L, H, fillL, part, pose); break;
                 case "wanderer":
@@ -1661,7 +2969,7 @@ namespace NW.App
                 case "sniper":
                     P3DBuildSniper  (px, R, p, L, H, fillL, part, pose); break;
                 case "paladin":
-                    P3DBuildPaladin (px, R, p, L, H, fillL, pose); break;
+                    P3DBuildPaladin (px, R, p, L, H, fillL, part, pose); break;
                 case "shield-bot":
                     P3DBuildShieldBot(px, R, p, L, H, fillL, pose); break;
                 case "hacker":
@@ -2173,8 +3481,8 @@ namespace NW.App
             // Dispatch silhouette to theme-specific unit builder
             switch (artId)
             {
-                case "knight": P3DBuildKnight  (px, R, p, L, H, fillL, 0); break;
-                case "worker": P3DBuildWorker  (px, R, p, L, H, fillL, 0); break;
+                case "knight": P3DBuildKnight  (px, R, p, L, H, fillL, pose: 0); break;
+                case "worker": P3DBuildWorker  (px, R, p, L, H, fillL, pose: 0); break;
                 case "wanderer": P3DBuildWanderer(px, R, p, L, H, fillL, 0); break;
                 default:       P3DBuildTrooper (px, R, p, L, H, fillL, 0); break;
             }
@@ -2326,11 +3634,13 @@ namespace NW.App
         // ── ARCHER — medieval Sniper, authored art ─────────────────────────────
         // Longbow held across the body: drawn on the windup, loosed on the strike. Light kit
         // (no plate) so it reads as fragile next to a knight, with a livery hood and quiver.
+        // part 3 = torso/head only, no limbs -- see _rigs["archer"] below.
         static void P3DBuildArcher(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -2349,6 +3659,7 @@ namespace NW.App
             Vector2 fElb  = V(J(12), J(13)), fHand = V(J(14), J(15));
             Vector2 head  = V(q == 5 ? 61 : 66, 104);
 
+            if (!rigged) {
             // far limbs
             P3DLimb(px,R, shF.x, shF.y, fElb.x, fElb.y, 4.6f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fElb.x, fElb.y, fHand.x, fHand.y, 4.0f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -2359,63 +3670,71 @@ namespace NW.App
             P3DLimb(px,R, nKnee.x, nKnee.y, nFoot.x, nFoot.y, 5.8f*s, leatherDk, 0.2f, 0.3f, L,H,fillL);
             P3DPlate(px,R, new[]{ new Vector2(nFoot.x-7f*s,nFoot.y+3f*s), new Vector2(nFoot.x+8f*s,nFoot.y+3f*s),
                                   new Vector2(nFoot.x+6f*s,nFoot.y-4f*s), new Vector2(nFoot.x-6f*s,nFoot.y-4f*s) },
-                     leather, leatherDk, 1.6f);
+                     leather, leatherDk, 1.6f*s);
+            }
             // quiver on the back
-            P3DPlate(px,R, new[]{ V(50,86), V(58,88), V(62,62), V(54,60) }, leather, leatherDk, 1.8f);
+            P3DPlate(px,R, new[]{ V(50,86), V(58,88), V(62,62), V(54,60) }, leather, leatherDk, 1.8f*s);
             for (int i = 0; i < 3; i++)
                 DrawLineR(px,R, (52f+i*3f)*s, 88f*s, (53f+i*3f)*s, 98f*s, 1.5f*s, wood);
             // jerkin
             P3DPlate(px,R, new[]{ V(54,88), V(72,88), V(74,70), V(68,56), V(58,56), V(52,70) },
-                     cloth, clothDk, 2.2f);
+                     cloth, clothDk, 2.2f*s);
             DrawLineR(px,R, 52f*s, 74f*s, 74f*s, 80f*s, 3f*s, leather);   // baldric
+            if (!rigged) {
             // near arm
             P3DLimb(px,R, shN.x, shN.y, nElb.x, nElb.y, 5.0f*s, cloth, p.metallic*.6f, p.smoothness*.7f, L,H,fillL);
             P3DLimb(px,R, nElb.x, nElb.y, nHand.x, nHand.y, 4.4f*s, cloth, p.metallic*.6f, p.smoothness*.7f, L,H,fillL);
+            }
             // hood
             P3DPlate(px,R, new[]{
                 new Vector2(head.x-10f*s, head.y-10f*s), new Vector2(head.x+10f*s, head.y-10f*s),
                 new Vector2(head.x+9f*s, head.y+8f*s), new Vector2(head.x-2f*s, head.y+13f*s),
                 new Vector2(head.x-11f*s, head.y+6f*s)
-            }, cloth, clothDk, 2f);
+            }, cloth, clothDk, 2f*s);
             P3DEllipseGlow(px,R, head.x+4f*s, head.y-1f*s, 3f*s, 2.6f*s, new Color(1f,0.88f,0.5f,0.9f));
 
+            if (!rigged) {
             // longbow: held forward, string drawn back on the windup, loosed on the strike
+            float draw = q == 3 ? 11f : (q == 4 ? -2f : 5f);
+            Vector2 grip = Vector2.Lerp(nHand, V(78, 78), 0.55f);
+            Vector2 top = new Vector2(grip.x + 4f*s, grip.y + 30f*s);
+            Vector2 bot = new Vector2(grip.x + 4f*s, grip.y - 30f*s);
+            // limbs of the bow
+            DrawLineR(px,R, grip.x+9f*s, grip.y, top.x, top.y, 3.2f*s, wood);
+            DrawLineR(px,R, grip.x+9f*s, grip.y, bot.x, bot.y, 3.2f*s, wood);
+            // string, pulled back by `draw`
+            Vector2 nock = new Vector2(grip.x - draw*s, grip.y);
+            DrawLineR(px,R, top.x, top.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
+            DrawLineR(px,R, bot.x, bot.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
+            if (q == 4)   // arrow away
             {
-                float draw = q == 3 ? 11f : (q == 4 ? -2f : 5f);
-                Vector2 grip = Vector2.Lerp(nHand, V(78, 78), 0.55f);
-                Vector2 top = new Vector2(grip.x + 4f*s, grip.y + 30f*s);
-                Vector2 bot = new Vector2(grip.x + 4f*s, grip.y - 30f*s);
-                // limbs of the bow
-                DrawLineR(px,R, grip.x+9f*s, grip.y, top.x, top.y, 3.2f*s, wood);
-                DrawLineR(px,R, grip.x+9f*s, grip.y, bot.x, bot.y, 3.2f*s, wood);
-                // string, pulled back by `draw`
-                Vector2 nock = new Vector2(grip.x - draw*s, grip.y);
-                DrawLineR(px,R, top.x, top.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
-                DrawLineR(px,R, bot.x, bot.y, nock.x, nock.y, 1.2f*s, new Color(0.85f,0.83f,0.75f));
-                if (q == 4)   // arrow away
-                {
-                    DrawLineR(px,R, (grip.x+16f*s), grip.y, (grip.x+44f*s), grip.y, 1.8f*s, wood);
-                    P3DPlate(px,R, new[]{ new Vector2(grip.x+44f*s, grip.y+3f*s),
-                                          new Vector2(grip.x+52f*s, grip.y),
-                                          new Vector2(grip.x+44f*s, grip.y-3f*s) }, steel, farDk, 1.2f);
-                }
-                else
-                {
-                    DrawLineR(px,R, nock.x, nock.y, (grip.x+18f*s), grip.y, 1.6f*s, wood);
-                    P3DPlate(px,R, new[]{ new Vector2(grip.x+18f*s, grip.y+3f*s),
-                                          new Vector2(grip.x+25f*s, grip.y),
-                                          new Vector2(grip.x+18f*s, grip.y-3f*s) }, steel, farDk, 1.2f);
-                }
+                DrawLineR(px,R, (grip.x+16f*s), grip.y, (grip.x+44f*s), grip.y, 1.8f*s, wood);
+                P3DPlate(px,R, new[]{ new Vector2(grip.x+44f*s, grip.y+3f*s),
+                                      new Vector2(grip.x+52f*s, grip.y),
+                                      new Vector2(grip.x+44f*s, grip.y-3f*s) }, steel, farDk, 1.2f*s);
+            }
+            else
+            {
+                DrawLineR(px,R, nock.x, nock.y, (grip.x+18f*s), grip.y, 1.6f*s, wood);
+                P3DPlate(px,R, new[]{ new Vector2(grip.x+18f*s, grip.y+3f*s),
+                                      new Vector2(grip.x+25f*s, grip.y),
+                                      new Vector2(grip.x+18f*s, grip.y-3f*s) }, steel, farDk, 1.2f*s);
+            }
             }
         }
 
         // ── PALADIN — medieval Shield-bot, authored art ────────────────────────
         // The tower shield IS the silhouette, per the audit: broad, short, and the barrier
         // dominates the outline. Heavy plate, winged helm, mace behind the shield.
-        static void P3DBuildPaladin(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["paladin"] below. The tower shield
+        // is body-mounted, not hand-held (its plates key off `bx`, not the mace hand), so it
+        // stays outside the rig either way, same as Cyber Bastion's shield.
+        static void P3DBuildPaladin(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -2429,6 +3748,7 @@ namespace NW.App
             Vector2 nElb  = V(J(8), J(9)), nHand = V(J(10), J(11));
             Vector2 head  = V(q == 5 ? 58 : 63, 100);
 
+            if (!rigged) {
             // far limbs + legs (short and thick)
             P3DLimb(px,R, shF.x, shF.y, V(J(12),J(13)).x, V(J(12),J(13)).y, 5.6f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x, hip.y, fKnee.x, fKnee.y, 8.4f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -2439,10 +3759,11 @@ namespace NW.App
             foreach (var f in new[]{ nFoot, fFoot })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-9f*s,f.y+4f*s), new Vector2(f.x+10f*s,f.y+4f*s),
                                       new Vector2(f.x+8f*s,f.y-5f*s), new Vector2(f.x-8f*s,f.y-5f*s) },
-                         steelDk, farDk, 1.8f);
+                         steelDk, farDk, 1.8f*s);
+            }
             // broad cuirass
             P3DPlate(px,R, new[]{ V(48,86), V(76,86), V(79,66), V(72,50), V(52,50), V(45,66) },
-                     steelHi, steel, 2.4f);
+                     steelHi, steel, 2.4f*s);
             DrawLineR(px,R, 46f*s, 76f*s, 78f*s, 76f*s, 2.6f*s, ArtGold);
             DrawLineR(px,R, 47f*s, 62f*s, 77f*s, 68f*s, 3.2f*s, livery);      // livery sash
             // winged great-helm
@@ -2450,32 +3771,33 @@ namespace NW.App
                 new Vector2(head.x-11f*s, head.y-11f*s), new Vector2(head.x+11f*s, head.y-11f*s),
                 new Vector2(head.x+12f*s, head.y+7f*s), new Vector2(head.x, head.y+13f*s),
                 new Vector2(head.x-12f*s, head.y+7f*s)
-            }, steelHi, steelDk, 2.2f);
+            }, steelHi, steelDk, 2.2f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-9f*s, head.y-1f*s), new Vector2(head.x+9f*s, head.y-1f*s),
                                   new Vector2(head.x+9f*s, head.y+2.4f*s), new Vector2(head.x-9f*s, head.y+2.4f*s) },
-                     new Color(0.05f,0.05f,0.08f), new Color(0.02f,0.02f,0.04f), 1f);
+                     new Color(0.05f,0.05f,0.08f), new Color(0.02f,0.02f,0.04f), 1f*s);
             // helm wings
             foreach (float side in new[]{ -1f, 1f })
                 P3DPlate(px,R, new[]{
                     new Vector2(head.x + side*10f*s, head.y+4f*s),
                     new Vector2(head.x + side*22f*s, head.y+12f*s),
                     new Vector2(head.x + side*20f*s, head.y+2f*s)
-                }, ArtGoldHi, ArtGold, 1.4f);
+                }, ArtGoldHi, ArtGold, 1.4f*s);
+            if (!rigged) {
             // mace arm behind the shield
             P3DLimb(px,R, shN.x, shN.y, nElb.x, nElb.y, 6f*s, steel, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
             P3DLimb(px,R, nElb.x, nElb.y, nHand.x, nHand.y, 5.2f*s, steel, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
-            {
-                float sw = q == 4 ? 18f : (q == 3 ? -10f : 4f);
-                DrawLineR(px,R, nHand.x, nHand.y, (nHand.x+sw*s), (nHand.y+18f*s), 3.4f*s, ArtLeather);
-                FillCircleR(px,R, (nHand.x+sw*s), (nHand.y+18f*s), 6.4f*s, steelHi);
+            float sw = q == 4 ? 18f : (q == 3 ? -10f : 4f);
+            DrawLineR(px,R, nHand.x, nHand.y, (nHand.x+sw*s), (nHand.y+18f*s), 3.4f*s, ArtLeather);
+            FillCircleR(px,R, (nHand.x+sw*s), (nHand.y+18f*s), 6.4f*s, steelHi);
             }
-            // TOWER SHIELD — the silhouette
+            // TOWER SHIELD — the silhouette. Body-mounted (bx is body space, not a hand joint),
+            // so it stays outside the rig and is always drawn, same as Cyber Bastion.
             {
                 float px0 = q == 4 ? 16f : (q == 3 ? 4f : 10f);
                 float bx = 64f + px0;
                 P3DPlate(px,R, new[]{
                     V(bx-12, 92), V(bx+12, 92), V(bx+14, 58), V(bx+4, 34), V(bx-8, 34), V(bx-14, 58)
-                }, steel, steelDk, 2.6f);
+                }, steel, steelDk, 2.6f*s);
                 // border + heraldic cross in livery
                 P3DPolyLine(px,R, new[]{
                     V(bx-9, 88), V(bx+9, 88), V(bx+11, 58), V(bx+3, 40), V(bx-6, 40), V(bx-11, 58)
@@ -2548,7 +3870,10 @@ namespace NW.App
         static void P3DBuildSiege(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, same four-beat fix as Cruiser/Speeder/Bot: q1/q6 the roll's extremes,
+            // q2/q7 its shared middle crossing -- finer spoke rotation too, sampled at 4
+            // points instead of 2.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
             Color woodHi = new Color(0.62f, 0.45f, 0.26f);
@@ -2558,8 +3883,11 @@ namespace NW.App
             Color ironHi = new Color(0.68f, 0.72f, 0.78f);
             Color livery = ArtLivery(p);
 
-            // roll: the cart rocks and the wheels shift between walk frames
-            float roll = q == 1 ? 1.6f : (q == 2 ? -1.6f : 0f);
+            // roll: the cart rocks and the wheels shift between walk frames. This is a
+            // monotonic sweep (like a leg's swing), not a symmetric bob -- the wheel needs to
+            // keep turning the same direction, not oscillate back to the same zero-crossing --
+            // so it gets Crawler's four-beat pattern rather than Cruiser's bob pattern.
+            float roll = q == 1 ? 1.6f : (q == 2 ? 0.53f : (q == 6 ? -0.53f : (q == 7 ? -1.6f : 0f)));
             float recoil = q == 4 ? -6f : (q == 3 ? 3f : 0f);
 
             P3DEllipseGlow(px, R, 64f*s, 15f*s, 34f*s, 7f*s, new Color(0f,0f,0f,0.45f));
@@ -2628,7 +3956,10 @@ namespace NW.App
         static void P3DBuildRogue(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: a wing beat sweeps monotonically through its range each cycle (up through
+            // neutral to fully down, not a symmetric bob back to the same crossing), so it gets
+            // Crawler's four linearly-spaced samples rather than Cruiser's bob pattern.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
             Color cloak   = ArtLivery(p);
@@ -2637,7 +3968,7 @@ namespace NW.App
             Color steel   = ArtSteelHi(p);
 
             // wing beat
-            float beat = q == 1 ? 10f : (q == 2 ? -8f : (Atk(q) ? 14f : 0f));
+            float beat = q == 1 ? 10f : (q == 2 ? 4f : (q == 6 ? -2f : (q == 7 ? -8f : (Atk(q) ? 14f : 0f))));
 
             // far wing
             P3DPlate(px, R, new[]{
@@ -2685,7 +4016,9 @@ namespace NW.App
         static void P3DBuildPigeon(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, same reasoning as Rogue -- a wing beat sweeps its range each cycle, four
+            // linearly-spaced samples instead of a straight up/down toggle.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
             Color body   = ArtLivery(p);
@@ -2694,7 +4027,7 @@ namespace NW.App
             Color beak   = new Color(0.95f, 0.72f, 0.25f);
 
             // wing beat: up on 1, down on 2, swept on the dive
-            float up = q == 1 ? 16f : (q == 2 ? -12f : (Atk(q) ? -18f : 2f));
+            float up = q == 1 ? 16f : (q == 2 ? 7f : (q == 6 ? -3f : (q == 7 ? -12f : (Atk(q) ? -18f : 2f))));
             float dive = q == 4 ? -6f : 0f;
 
             // far wing
@@ -3046,10 +4379,13 @@ namespace NW.App
         }
 
         // ---- SHINOBI — Sakura trooper ---------------------------------------------
-        static void P3DBuildShinobi(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["shinobi"] below.
+        static void P3DBuildShinobi(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Vector2 hip = V(63,56), shN = V(64,84), shF = V(56,84);
@@ -3059,6 +4395,7 @@ namespace NW.App
             float sway = q == 1 ? 3f : (q == 2 ? -3f : (Atk(q) ? 5f : 0f));
             Color mf = ArtSteelFar(p), md = ArtSteelDk(p);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, fE.x,fE.y, 4.6f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fE.x,fE.y, fH.x,fH.y, 4.0f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 6.4f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -3070,8 +4407,9 @@ namespace NW.App
                 Vector2 f = i == 0 ? fF : nF;
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
                                       new Vector2(f.x+8f*s,f.y-3f*s), new Vector2(f.x-6f*s,f.y-3f*s) },
-                         i == 0 ? SakPaperDk : SakPaper, SakPaperDk, 1.5f);
+                         i == 0 ? SakPaperDk : SakPaper, SakPaperDk, 1.5f*s);
                 DrawLineR(px,R, f.x+3f*s, f.y+3f*s, f.x+4f*s, f.y-3f*s, 1.1f*s, ArtOutline);  // split toe
+            }
             }
             for (int i = 0; i < 4; i++)
             {
@@ -3090,8 +4428,10 @@ namespace NW.App
                                     new Vector2(shN.x+8f*s,shN.y-8f*s), new Vector2(shN.x-10f*s,shN.y-9f*s) },
                        p, 2f);
             SakLace(px,R, shN.x/s-8f, shN.y/s+2f, shN.x/s+6f, shN.y/s+3f, 3, ArtCloth, s);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.0f*s, SakLac(p), p.metallic, p.smoothness, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.4f*s, SakLac(p), p.metallic, p.smoothness, L,H,fillL);
+            }
             SakLacquer(px,R, new[]{ new Vector2(head.x-10f*s,head.y-10f*s), new Vector2(head.x+10f*s,head.y-9f*s),
                                     new Vector2(head.x+9f*s,head.y+7f*s), new Vector2(head.x-9f*s,head.y+6f*s) },
                        p, 2.1f);
@@ -3102,7 +4442,7 @@ namespace NW.App
             P3DPlate(px,R, new[]{ new Vector2(head.x-2f*s,head.y+7f*s), new Vector2(head.x-9f*s,head.y+22f*s),
                                   new Vector2(head.x+1f*s,head.y+20f*s), new Vector2(head.x+4f*s,head.y+8f*s) },
                      ArtGoldHi, ArtGold, 1.4f);
-            {
+            if (!rigged) {
                 float swing = q == 4 ? 54f : (q == 3 ? -58f : -16f);
                 Vector2 d = RotP(new Vector2(0f,1f), Vector2.zero, swing);
                 Vector2 tip = new Vector2(nH.x + d.x*40f*s, nH.y + d.y*40f*s);
@@ -3116,7 +4456,7 @@ namespace NW.App
                     new Vector2(tip.x+d.x*13f*s+pp.x*8f*s, tip.y+d.y*13f*s+pp.y*8f*s),
                     new Vector2(tip.x+d.x*24f*s+pp.x*1f*s, tip.y+d.y*24f*s+pp.y*1f*s),
                     new Vector2(tip.x+d.x*11f*s-pp.x*2f*s, tip.y+d.y*11f*s-pp.y*2f*s) },
-                    new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.7f);
+                    new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.7f*s);
                 DrawLineR(px,R, tip.x+pp.x*2f*s, tip.y+pp.y*2f*s, tip.x+d.x*22f*s, tip.y+d.y*22f*s,
                           1.0f*s, new Color(1f,1f,1f,0.55f));
                 if (q == 4)
@@ -3126,11 +4466,13 @@ namespace NW.App
         }
 
         // ---- YUMI — Sakura sniper ---------------------------------------------------
+        // part 3 = torso/head only, no limbs -- see _rigs["yumi"] below.
         static void P3DBuildYumi(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Vector2 hip = V(63,56), shN = V(64,84), shF = V(56,84);
@@ -3139,6 +4481,7 @@ namespace NW.App
             Vector2 head = V(q == 5 ? 61 : 66, 104);
             Color mf = ArtSteelFar(p), md = ArtSteelDk(p);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 4.2f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 6.0f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 5.2f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -3149,7 +4492,8 @@ namespace NW.App
                 Vector2 f = i == 0 ? fF : nF;
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
                                       new Vector2(f.x+8f*s,f.y-3f*s), new Vector2(f.x-6f*s,f.y-3f*s) },
-                         i == 0 ? SakPaperDk : SakPaper, SakPaperDk, 1.5f);
+                         i == 0 ? SakPaperDk : SakPaper, SakPaperDk, 1.5f*s);
+            }
             }
             // hakama: hard pleat creases, never a drape
             SakFold(px,R, V(52,60), V(74,60), V(76,36), V(50,36), 0.5f, ArtCloth, ArtClothDk);
@@ -3159,17 +4503,19 @@ namespace NW.App
                      SakPaper, SakPaperDk, 2.2f);
             P3DPlate(px,R, new[]{ V(62,88), V(76,88), V(78,70), V(64,66) }, ArtCloth, ArtClothDk, 2.0f);
             SakLace(px,R, 56,80, 72,82, 4, ArtLeather, s);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 4.8f*s, SakPaperDk, 0.1f,0.2f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.2f*s, SakPaperDk, 0.1f,0.2f, L,H,fillL);
+            }
             P3DPlate(px,R, new[]{ new Vector2(head.x-9f*s,head.y-8f*s), new Vector2(head.x+9f*s,head.y-7f*s),
                                   new Vector2(head.x+8f*s,head.y+7f*s), new Vector2(head.x-8f*s,head.y+6f*s) },
-                     new Color(0.72f,0.60f,0.52f), new Color(0.44f,0.34f,0.30f), 2f);
+                     new Color(0.72f,0.60f,0.52f), new Color(0.44f,0.34f,0.30f), 2f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-10f*s,head.y+2f*s), new Vector2(head.x+10f*s,head.y+3f*s),
                                   new Vector2(head.x+10f*s,head.y+7f*s), new Vector2(head.x-10f*s,head.y+6f*s) },
-                     ArtCloth, ArtClothDk, 1.3f);
+                     ArtCloth, ArtClothDk, 1.3f*s);
             DrawLineR(px,R, head.x-10f*s, head.y+5f*s, head.x-20f*s, head.y+1f*s, 1.8f*s, ArtCloth);
             P3DEllipseGlow(px,R, head.x+3f*s, head.y-1f*s, 2.6f*s, 2.0f*s, new Color(0.15f,0.08f,0.06f,0.95f));
-            {
+            if (!rigged) {
                 // THE yumi: gripped a third from the bottom, so the limbs are wildly unequal.
                 // Every other bow in the game is symmetric and held at its centre.
                 float draw = q == 3 ? 12f : (q == 4 ? -2f : 5f);
@@ -3194,16 +4540,20 @@ namespace NW.App
                 {
                     DrawLineR(px,R, nx*s,ny*s, (gx+16f)*s,(gy+8f)*s, 1.5f*s, ArtLeather);
                     P3DPlate(px,R, new[]{ V(gx+16,gy+11), V(gx+24,gy+8), V(gx+16,gy+5) },
-                             new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.2f);
+                             new Color(0.94f,0.94f,0.97f), ArtSteelDk(p), 1.2f*s);
                 }
             }
         }
 
         // ---- SHRINE — Sakura shield-bot ---------------------------------------------
-        static void P3DBuildShrineGuard(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["shrine"] below. The gate door is
+        // body-mounted (bx, not a hand joint) so it stays outside the rig either way.
+        static void P3DBuildShrineGuard(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Vector2 hip = V(62,52), shN = V(63,80), shF = V(55,80);
@@ -3213,6 +4563,7 @@ namespace NW.App
             Vector2 head = V(q == 5 ? 58 : 63, 98);
             Color mf = ArtSteelFar(p);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 5.2f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 7.6f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 6.6f*s, mf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -3221,7 +4572,8 @@ namespace NW.App
             foreach (var f in new[]{ nF, fF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-8f*s,f.y+4f*s), new Vector2(f.x+9f*s,f.y+4f*s),
                                       new Vector2(f.x+8f*s,f.y-4f*s), new Vector2(f.x-7f*s,f.y-4f*s) },
-                         SakPaperDk, new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f), 1.6f);
+                         SakPaperDk, new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f), 1.6f*s);
+            }
             for (int r = 0; r < 3; r++)
             {
                 float yy = 84f - r*11f;
@@ -3240,8 +4592,10 @@ namespace NW.App
             P3DPlate(px,R, new[]{ new Vector2(head.x+3f*s,head.y+6f*s), new Vector2(head.x+11f*s,head.y+20f*s),
                                   new Vector2(head.x+4f*s,head.y+18f*s), new Vector2(head.x-1f*s,head.y+7f*s) },
                      ArtGoldHi, ArtGold, 1.4f);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.6f*s, SakLac(p), p.metallic, p.smoothness, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.8f*s, SakLac(p), p.metallic, p.smoothness, L,H,fillL);
+            }
             {
                 float bx = 64f + (q == 4 ? 14f : (q == 3 ? 3f : 9f));
                 SakLacquer(px,R, new[]{ V(bx-15,92), V(bx+15,92), V(bx+15,34), V(bx-15,34) }, p, 2.6f);
@@ -3265,9 +4619,12 @@ namespace NW.App
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, same four-beat fix as Crawler -- legs sweep through mid-stride positions
+            // (q6/q7) instead of snapping directly between the two extremes (q1/q2), with a
+            // small per-leg ripple so the front/back leg of each pair don't snap in lockstep.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            float st = q == 1 ? 2f : (q == 2 ? -2f : 0f);
+            float stBase = q == 1 ? 1.6f : (q == 2 ? 0.53f : (q == 6 ? -0.53f : (q == 7 ? -1.6f : 0f)));
             float rec = q == 4 ? -6f : (q == 3 ? 3f : 0f);
             Color mf = ArtSteelFar(p), md = ArtSteelDk(p);
 
@@ -3276,10 +4633,11 @@ namespace NW.App
             for (int i = 0; i < 4; i++)
             {
                 float gx = legs[i,0], dir = legs[i,1];
+                float st = stBase + (i % 2 == 0 ? -0.4f : 0.4f);
                 float ax = gx + dir*3f + st*dir*2f;
                 P3DLimb(px,R, gx*s,42f*s, ax*s,22f*s, 5.2f*s, i < 2 ? mf : md, 0.2f,0.4f, L,H,fillL);
                 P3DPlate(px,R, new[]{ V(ax-7,24), V(ax+7,24), V(ax+6,16), V(ax-6,16) },
-                         SakPaperDk, new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f), 1.6f);
+                         SakPaperDk, new Color(SakPaperDk.r*0.7f,SakPaperDk.g*0.7f,SakPaperDk.b*0.7f), 1.6f*s);
             }
             SakLacquer(px,R, new[]{ V(42,42), V(86,42), V(84,58), V(44,58) }, p, 2.3f);
             SakLace(px,R, 46,50, 82,50, 8, ArtCloth, s);
@@ -3420,9 +4778,10 @@ namespace NW.App
         static void P3DBuildKite(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: tail-streamer beat sweeps its range each cycle, same reasoning as Rogue.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            float beat = q == 1 ? 12f : (q == 2 ? -10f : (Atk(q) ? 16f : 0f));
+            float beat = q == 1 ? 12f : (q == 2 ? 5f : (q == 6 ? -3f : (q == 7 ? -10f : (Atk(q) ? 16f : 0f))));
             float cx = 58f, cy = 62f + (q == 4 ? -5f : 0f);
             float w = 26f, h = 34f;
 
@@ -3472,19 +4831,14 @@ namespace NW.App
             Vector2 shN = V(64+sway, 84+bob), shF = V(56+sway, 84+bob);
             Vector2 nE = V(J(8)+sway, J(9)+bob), nH = V(J(10)+sway, J(11)+bob);
             Vector2 fE = V(J(12)+sway, J(13)+bob);
-            Vector2 nK = V(J(0),J(1)), nF = V(J(2),J(3)), fK = V(J(4),J(5)), fF = V(J(6),J(7));
             Vector2 head = V((q == 5 ? 60 : 65) + sway, 102 + bob);
             Color mf = ArtSteelFar(p);
 
-            P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 4.6f*s, mf, 0.1f,0.2f, L,H,fillL);
-            P3DLimb(px,R, nK.x,nK.y, nF.x,nF.y, 5.2f*s, ArtClothDk, 0.1f,0.2f, L,H,fillL);
-            for (int i = 0; i < 2; i++)
-            {
-                Vector2 f = i == 0 ? fF : nF;
-                P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
-                                      new Vector2(f.x+8f*s,f.y-3f*s), new Vector2(f.x-6f*s,f.y-3f*s) },
-                         i == 0 ? SakPaperDk : SakPaper, SakPaperDk, 1.5f);
-            }
+            // This unit hovers -- it has no legs. Same pre-existing bug as Cyber's Cipher,
+            // Synthwave's Keytar and Biopunk's Mycelium: two P3DLimb "shins" were drawn straight
+            // from the shared leg-joint table with no sway/bob applied and no thigh connecting
+            // them to the (sway/bob-adjusted) body at all -- a disconnected floating pair of
+            // capsules near the ground in every pose.
             P3DLimb(px,R, shF.x,shF.y, fE.x,fE.y, 5.4f*s,
                     new Color(ArtClothDk.r*0.8f,ArtClothDk.g*0.8f,ArtClothDk.b*0.8f), 0.1f,0.2f, L,H,fillL);
             // kariginu: stiff sleeves that hold their shape. Folded, never draped -- this is the
@@ -3685,37 +5039,64 @@ namespace NW.App
 
         /// <summary>Stacked torso panels with a lit gap between them — the Cyber body.</summary>
         static void CybTorso(Color[] px, int R, float cx, float cy, float w, float h,
-                             P3DP p, bool hot, float s)
+                             P3DP p, bool hot, float s, Vector3 L, Vector3 H)
         {
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            P3DPlate(px, R, new[]{ V(cx-w, cy+h), V(cx+w, cy+h),
+            P3DPlateLit(px, R, new[]{ V(cx-w, cy+h), V(cx+w, cy+h),
                                    V(cx+w*0.86f, cy-h*0.55f), V(cx-w*0.86f, cy-h*0.55f) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             CybPanelGap(px,R, (cx-w*0.94f)*s, (cy+h*0.28f)*s, (cx+w*0.94f)*s, (cy+h*0.28f)*s, false, s);
             CybPanelGap(px,R, (cx-w*0.90f)*s, (cy-h*0.12f)*s, (cx+w*0.90f)*s, (cy-h*0.12f)*s, hot, s);
         }
 
-        /// <summary>Sensor visor — one band of light, never a face.</summary>
-        static void CybVisor(Color[] px, int R, float hx, float hy, P3DP p, Color col, float s)
+        /// <summary>Sensor visor on a real helmet dome — the visor plate used to float with
+        /// nothing behind it (a lit line on bare shadow); the dome gives it a head to sit on.</summary>
+        static void CybVisor(Color[] px, int R, float hx, float hy, P3DP p, Color col, float s, Vector3 L, Vector3 H)
         {
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            P3DPlate(px, R, new[]{ V(hx-10,hy-10), V(hx+10,hy-9), V(hx+9,hy+9), V(hx-9,hy+8) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
-            CybPanelGap(px,R, (hx-9)*s, (hy+3)*s, (hx+9)*s, (hy+4)*s, false, s);
-            DrawLineR(px,R, (hx-8)*s, (hy-2)*s, (hx+8)*s, (hy-1)*s, 3.4f*s, col);
+            P3DPlateLit(px, R, new[]{ V(hx-8,hy-16), V(hx+8,hy-16), V(hx+12,hy-9), V(hx+12,hy+3),
+                                      V(hx+8,hy+11), V(hx-8,hy+11), V(hx-12,hy+3), V(hx-12,hy-9) },
+                     CybChrDk(p), CybChrFar(p), L, H, 2.0f*s);
+            P3DPlateLit(px, R, new[]{ V(hx-10,hy-10), V(hx+10,hy-9), V(hx+9,hy+9), V(hx-9,hy+8) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
+            CybPanelGap(px,R, (hx-9)*s, (hy+3.5f)*s, (hx+9)*s, (hy+3.5f)*s, false, s);
+            DrawLineR(px,R, (hx-8)*s, (hy-1.5f)*s, (hx+8)*s, (hy-1.5f)*s, 3.4f*s, col);
             P3DEllipseGlow(px,R, hx*s, (hy-1)*s, 15f*s, 6f*s, new Color(col.r, col.g, col.b, 0.45f));
         }
 
+        /// <summary>Tapered rotor blade — replaces the old bare crossed-line pair, which read as
+        /// an X rather than a spinning prop.</summary>
+        static void CybRotorBlade(Color[] px, int R, float hubx, float huby, float angDeg,
+            float len, float halfW, Color col, float s, Vector3 L, Vector3 H)
+        {
+            float a = angDeg * Mathf.Deg2Rad;
+            float dx = Mathf.Cos(a), dy = Mathf.Sin(a) * 0.30f; // flattened for the side-view foreshortening
+            var hub = new Vector2(hubx*s, huby*s);
+            var tip = new Vector2((hubx+dx*len)*s, (huby+dy*len)*s);
+            var mid = Vector2.Lerp(hub, tip, 0.40f);
+            var nrm = new Vector2(-dy, dx).normalized * halfW * s;
+            P3DPlateLit(px, R, new[]{ hub, mid+nrm, tip, mid-nrm },
+                     new Color(col.r, col.g, col.b, 0.85f),
+                     new Color(col.r*0.55f, col.g*0.55f, col.b*0.55f, 0.55f), L, H, 1.1f*s);
+        }
+
         // ── DRONE — a machine with visible rotors, not an organ or a mote ────────
-        static void P3DBuildCybDrone(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = body only, no rotor blades -- see NeonArt.DroneRotor below, which bakes
+        // each hub's blade pair on its own full-canvas texture so a view can spin it
+        // continuously (Quaternion.Euler every frame) instead of flipping between a couple of
+        // fixed blade-angle poses, which is what "going up and down repeatedly instead of
+        // actually spinning like a rotor" was describing.
+        static void P3DBuildCybDrone(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose6(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 ? -3f : 0f));
             float spin = (q % 2 == 1) ? 45f : 0f;
-            P3DPlate(px,R, new[]{ V(54,66+dv), V(74,68+dv), V(72,80+dv), V(56,78+dv) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(54,66+dv), V(74,68+dv), V(72,80+dv), V(56,78+dv) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             CybPanelGap(px,R, 56f*s,(74f+dv)*s, 72f*s,(76f+dv)*s, true, s);
             for (int i = 0; i < 2; i++)
             {
@@ -3723,17 +5104,21 @@ namespace NW.App
                 float ax = 64f + dir*20f, ay = 76f + dv + dir*2f;
                 DrawLineR(px,R, 64f*s,(73f+dv)*s, ax*s,ay*s, 3.0f*s, CybChrDk(p));
                 FillCircleR(px,R, ax*s, ay*s, 3.0f*s, CybChrDk(p));
-                for (int b = 0; b < 2; b++)
-                {
-                    float a = (spin + b*90f) * Mathf.Deg2Rad;
-                    DrawLineR(px,R, (ax - Mathf.Cos(a)*11f)*s, (ay - Mathf.Sin(a)*3.2f)*s,
-                                    (ax + Mathf.Cos(a)*11f)*s, (ay + Mathf.Sin(a)*3.2f)*s,
-                              1.6f*s, new Color(CybCold.r, CybCold.g, CybCold.b, 0.75f));
+                // One blade through the hub (opposite tips, 180° apart) instead of two lines at
+                // 90° — the old pair drew an X rather than a two-blade prop.
+                if (!rigged) {
+                CybRotorBlade(px,R, ax, ay, spin,       11f, 2.1f, CybCold, s, L, H);
+                CybRotorBlade(px,R, ax, ay, spin+180f,  11f, 2.1f, CybCold, s, L, H);
                 }
             }
-            FillCircleR(px,R, 64f*s, (70f+dv)*s, 3.2f*s, CybHot);
-            P3DEllipseGlow(px,R, 64f*s, (70f+dv)*s, 13f*s, 11f*s,
-                           new Color(CybHot.r, CybHot.g, CybHot.b, 0.45f));
+            // Layered light: tight bright core + hotspot + inner glow + soft wide falloff,
+            // instead of one flat dot with a single glow ellipse.
+            FillCircleR(px,R, 64f*s, (70f+dv)*s, 2.4f*s, CybHot);
+            FillCircleR(px,R, 64f*s-0.7f*s, (70f+dv)*s-0.7f*s, 0.9f*s, new Color(1f,1f,1f,0.9f));
+            P3DEllipseGlow(px,R, 64f*s, (70f+dv)*s, 8f*s, 7f*s,
+                           new Color(CybHot.r, CybHot.g, CybHot.b, 0.55f));
+            P3DEllipseGlow(px,R, 64f*s, (70f+dv)*s, 15f*s, 13f*s,
+                           new Color(CybHot.r, CybHot.g, CybHot.b, 0.22f));
             for (int k = 0; k < 3; k++)
                 DrawLineR(px,R, (64f-7f+k*7f)*s, (64f+dv)*s, (64f-11f+k*11f)*s, (54f+dv)*s,
                           1.3f*s, new Color(CybHot.r, CybHot.g, CybHot.b, 0.45f-k*0.1f));
@@ -3744,10 +5129,17 @@ namespace NW.App
         }
 
         // ── TROOPER — the one that shows its joints ──────────────────────────────
-        static void P3DBuildCybTrooper(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs. The six limb segments then come from
+        // UnitLimb() and are rotated live by the view (see _rigs["cybtrooper"] below), so
+        // the walk bends continuously through a real knee/hip instead of jump-cutting
+        // between four baked poses. Attack poses (windup/strike/flinch) are untouched and
+        // still render the full un-rigged draw below, same as every other Cyber unit.
+        static void P3DBuildCybTrooper(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
             float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
@@ -3755,6 +5147,7 @@ namespace NW.App
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13], fHx = SideJoints[q,14], fHy = SideJoints[q,15];
             float hx = q == 5 ? 60f : 66f;
             var far = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+            if (!rigged) {
             P3DLimb(px,R, 56f*s,84f*s, fEx*s,fEy*s, 4.8f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fEx*s,fEy*s, fHx*s,fHy*s, 4.2f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 63f*s,56f*s, fKx*s,fKy*s, 6.6f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
@@ -3763,58 +5156,77 @@ namespace NW.App
             P3DLimb(px,R, 63f*s,56f*s, nKx*s,nKy*s, 7.2f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 6.2f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, nKx*s, nKy*s, 20f, 13f, 4.0f, p, s);
-            P3DPlate(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+9,fFy+3), V(fFx+7,fFy-4), V(fFx-6,fFy-4) },
-                     CybChrFar(p), CybChrDk(p), 1.8f*s);
-            P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+9,nFy+3), V(nFx+7,nFy-4), V(nFx-6,nFy-4) },
-                     CybChr(p), CybChrDk(p), 1.8f*s);
-            CybTorso(px,R, 63f, 70f, 12f, 18f, p, true, s);
+            P3DPlateLit(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+9,fFy+3), V(fFx+7,fFy-4), V(fFx-6,fFy-4) },
+                     CybChrFar(p), CybChrDk(p), L, H, 1.8f*s);
+            P3DPlateLit(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+9,nFy+3), V(nFx+7,nFy-4), V(nFx-6,nFy-4) },
+                     CybChr(p), CybChrDk(p), L, H, 1.8f*s);
+            }
+            CybTorso(px,R, 63f, 70f, 12f, 18f, p, true, s, L, H);
             CybCoolant(px,R, new[]{ V(56,52), V(58,66), V(68,70), V(70,84) }, CybHot, s);
+            if (!rigged) {
             P3DLimb(px,R, 64f*s,84f*s, nEx*s,nEy*s, 5.2f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.6f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, nEx*s, nEy*s, 0f, 10f, 3.4f, p, s);
-            CybVisor(px,R, hx, 104f, p, CybHot, s);
+            }
+            CybVisor(px,R, hx, 104f, p, CybHot, s, L, H);
+            if (!rigged) {
+            // Baton: short, thick shaft with a glowing edge -- shortened from the old
+            // rifle-length prop so the swing through this same arc reads as a held melee
+            // weapon instead of a gun being punched through the air.
             float sw = q == 4 ? 52f : (q == 3 ? -56f : -16f);
             float rad = sw * Mathf.Deg2Rad;
             float dx = -Mathf.Sin(rad), dy = Mathf.Cos(rad);
-            DrawLineR(px,R, nHx - dx*8f*s, nHy - dy*8f*s, nHx + dx*30f*s, nHy + dy*30f*s, 4.4f*s, CybChrDk(p));
-            DrawLineR(px,R, nHx + dx*14f*s, nHy + dy*14f*s, nHx + dx*30f*s, nHy + dy*30f*s, 2.0f*s,
-                      new Color(CybHot.r, CybHot.g, CybHot.b, 0.9f));
+            DrawLineR(px,R, nHx*s - dx*4f*s, nHy*s - dy*4f*s, nHx*s + dx*22f*s, nHy*s + dy*22f*s, 5.0f*s, CybChrDk(p));
+            DrawLineR(px,R, nHx*s + dx*10f*s, nHy*s + dy*10f*s, nHx*s + dx*22f*s, nHy*s + dy*22f*s, 2.2f*s,
+                      new Color(CybHot.r, CybHot.g, CybHot.b, 0.95f));
             if (q == 4)
-                P3DEllipseGlow(px,R, nHx + dx*34f*s, nHy + dy*34f*s, 14f*s, 12f*s,
+                P3DEllipseGlow(px,R, nHx*s + dx*26f*s, nHy*s + dy*26f*s, 12f*s, 10f*s,
                                new Color(CybHot.r, CybHot.g, CybHot.b, 0.55f));
+            }
         }
 
         // ── SNIPER — charge state is drawn ON the weapon ─────────────────────────
-        static void P3DBuildCybSniper(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["cybsniper"] below. Same split as
+        // Lancer: attack poses (the laser sight-line, already the reference pattern for "an
+        // attack that visibly reaches its target") are untouched, only idle/walk go through
+        // the live rig.
+        static void P3DBuildCybSniper(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
             float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
             float nEx = SideJoints[q,8], nEy = SideJoints[q,9], nHx = SideJoints[q,10], nHy = SideJoints[q,11];
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13];
             float hx = q == 5 ? 61f : 66f;
+            if (!rigged) {
             P3DLimb(px,R, 56f*s,82f*s, fEx*s,fEy*s, 4.2f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 63f*s,54f*s, fKx*s,fKy*s, 5.8f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 5.0f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 63f*s,54f*s, nKx*s,nKy*s, 6.4f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 5.6f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, nKx*s, nKy*s, 20f, 11f, 3.4f, p, s);
-            P3DPlate(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+8,fFy+3), V(fFx+6,fFy-4), V(fFx-6,fFy-4) },
-                     CybChrDk(p), CybChrFar(p), 1.7f*s);
-            P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+8,nFy+3), V(nFx+6,nFy-4), V(nFx-6,nFy-4) },
-                     CybChrDk(p), CybChrFar(p), 1.7f*s);
-            CybTorso(px,R, 63f, 68f, 11f, 16f, p, false, s);
+            P3DPlateLit(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+8,fFy+3), V(fFx+6,fFy-4), V(fFx-6,fFy-4) },
+                     CybChrDk(p), CybChrFar(p), L, H, 1.7f*s);
+            P3DPlateLit(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+8,nFy+3), V(nFx+6,nFy-4), V(nFx-6,nFy-4) },
+                     CybChrDk(p), CybChrFar(p), L, H, 1.7f*s);
+            }
+            CybTorso(px,R, 63f, 68f, 11f, 16f, p, false, s, L, H);
             CybCoolant(px,R, new[]{ V(54,52), V(57,64), V(66,68), V(68,82) }, CybCold, s);
+            if (!rigged) {
             P3DLimb(px,R, 64f*s,82f*s, nEx*s,nEy*s, 4.8f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.2f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
-            CybVisor(px,R, hx, 102f, p, CybCold, s);
-            float gx = nHx, gy = nHy;
+            }
+            CybVisor(px,R, hx, 102f, p, CybCold, s, L, H);
+            if (!rigged) {
+            float gx = nHx*s, gy = nHy*s;
             bool chg = Atk(q);
-            P3DPlate(px,R, new[]{ new Vector2(gx-6f*s, gy+4f*s), new Vector2(gx+34f*s, gy+3f*s),
+            P3DPlateLit(px,R, new[]{ new Vector2(gx-6f*s, gy+4f*s), new Vector2(gx+34f*s, gy+3f*s),
                                   new Vector2(gx+34f*s, gy-3f*s), new Vector2(gx-6f*s, gy-4f*s) },
-                     CybChrHi(p), CybChrDk(p), 1.8f*s);
+                     CybChrHi(p), CybChrDk(p), L, H, 1.8f*s);
             for (int k = 0; k < 4; k++)
                 DrawLineR(px,R, gx+(4f+k*8f)*s, gy-3.4f*s, gx+(4f+k*8f)*s, gy+3.4f*s, 1.8f*s,
                           new Color(CybCold.r, CybCold.g, CybCold.b,
@@ -3828,18 +5240,23 @@ namespace NW.App
                 DrawLineR(px,R, gx+40f*s, gy, 124f*s, gy, 6f*s,
                           new Color(CybCold.r, CybCold.g, CybCold.b, 0.30f));
             }
+            }
         }
 
         // ── MECH — four legs, every joint on show ────────────────────────────────
+        // part 3 = torso/head only, no legs -- see _rigs["cybmech"] below. Highest-joint-count
+        // rig target after Lancer/Railgun: both legs benefit from a real knee bend at once.
         static void P3DBuildCybMech(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
                                     int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float st  = q == 1 ? 2f : (q == 2 ? 0f : (q == 6 ? -2f : (q == 7 ? 0f : 0f)));
             float rec = q == 4 ? -6f : (q == 3 ? 3f : 0f);
             var far = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+            if (!rigged) {
             for (int i = 0; i < 2; i++)
             {
                 float bx = 48f + i*30f, dir = i == 1 ? 1f : -1f;
@@ -3849,14 +5266,15 @@ namespace NW.App
                 P3DLimb(px,R, kx*s,ky*s, (kx+dir*8f)*s,12f*s, (i==1?6.0f:4.8f)*s,
                         i==1?CybChrDk(p):CybChrFar(p), 0.6f,0.5f, L,H,fillL);
                 CybActuator(px,R, kx*s, ky*s, dir*40f, 12f, i==1?4.0f:3.2f, i==1?p:far, s);
-                P3DPlate(px,R, new[]{ V(kx+dir*8-8,15), V(kx+dir*8+8,15), V(kx+dir*8+6,8), V(kx+dir*8-6,8) },
-                         CybChrDk(p), CybChrFar(p), 1.8f*s);
+                P3DPlateLit(px,R, new[]{ V(kx+dir*8-8,15), V(kx+dir*8+8,15), V(kx+dir*8+6,8), V(kx+dir*8-6,8) },
+                         CybChrDk(p), CybChrFar(p), L, H, 1.8f*s);
             }
-            P3DPlate(px,R, new[]{ V(38,52), V(90,56), V(88,76), V(40,72) }, CybChrHi(p), CybChr(p), 2.4f*s);
+            }
+            P3DPlateLit(px,R, new[]{ V(38,52), V(90,56), V(88,76), V(40,72) }, CybChrHi(p), CybChr(p), L, H, 2.4f*s);
             CybPanelGap(px,R, 40f*s,66f*s, 88f*s,69f*s, true, s);
             CybPanelGap(px,R, 41f*s,59f*s, 87f*s,62f*s, false, s);
             CybCoolant(px,R, new[]{ V(42,56), V(52,64), V(74,66), V(86,74) }, CybHot, s);
-            P3DPlate(px,R, new[]{ V(56,76), V(76,79), V(74,92), V(58,90) }, CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(56,76), V(76,79), V(74,92), V(58,90) }, CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             DrawLineR(px,R, 60f*s,92f*s, 60f*s,102f*s, 3.0f*s, CybChrDk(p));
             FillCircleR(px,R, 60f*s, 104f*s, 3.4f*s, CybHot);
             P3DEllipseGlow(px,R, 60f*s, 104f*s, 11f*s, 10f*s, new Color(CybHot.r,CybHot.g,CybHot.b,0.5f));
@@ -3875,10 +5293,15 @@ namespace NW.App
         }
 
         // ── WARDEN — the shield physically SPREADS on the brace ──────────────────
-        static void P3DBuildCybShield(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["cybshield"] below. The shield itself
+        // stays outside the rig: it's body-mounted, not hand-held (its plates key off `bx`, not
+        // the arm's hand position), so it belongs on the always-drawn body layer either way.
+        static void P3DBuildCybShield(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             // joints are raw 128-space values, so the nudge is raw too -- not scaled
             float nKx = SideJoints[q,0]-2f, nKy = SideJoints[q,1];
@@ -3888,29 +5311,40 @@ namespace NW.App
             float nEx = SideJoints[q,8], nEy = SideJoints[q,9], nHx = SideJoints[q,10], nHy = SideJoints[q,11];
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13];
             float hx = q == 5 ? 58f : 63f;
+            // Near legs get a slight lift off CybChrDk toward CybChr -- at CybChrDk alone they
+            // lost contrast against the dark base, especially under the shield's own shadow.
+            Color legNear = Color.Lerp(CybChrDk(p), CybChr(p), 0.35f);
+            if (!rigged) {
             P3DLimb(px,R, 55f*s,80f*s, fEx*s,fEy*s, 5.4f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 62f*s,52f*s, fKx*s,fKy*s, 7.6f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 6.6f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
-            P3DLimb(px,R, 62f*s,52f*s, nKx*s,nKy*s, 8.6f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
-            P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 7.4f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
+            P3DLimb(px,R, 62f*s,52f*s, nKx*s,nKy*s, 8.6f*s, legNear, 0.6f,0.5f, L,H,fillL);
+            P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 7.4f*s, legNear, 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, nKx*s, nKy*s, 20f, 14f, 4.4f, p, s);
-            P3DPlate(px,R, new[]{ V(nFx-8,nFy+4), V(nFx+9,nFy+4), V(nFx+8,nFy-5), V(nFx-7,nFy-5) },
-                     CybChrDk(p), CybChrFar(p), 1.9f*s);
-            P3DPlate(px,R, new[]{ V(fFx-8,fFy+4), V(fFx+9,fFy+4), V(fFx+8,fFy-5), V(fFx-7,fFy-5) },
-                     CybChrDk(p), CybChrFar(p), 1.9f*s);
-            CybTorso(px,R, 62f, 66f, 14f, 17f, p, true, s);
-            CybVisor(px,R, hx, 98f, p, CybHot, s);
+            P3DPlateLit(px,R, new[]{ V(nFx-8,nFy+4), V(nFx+9,nFy+4), V(nFx+8,nFy-5), V(nFx-7,nFy-5) },
+                     legNear, CybChrFar(p), L, H, 1.9f*s);
+            P3DPlateLit(px,R, new[]{ V(fFx-8,fFy+4), V(fFx+9,fFy+4), V(fFx+8,fFy-5), V(fFx-7,fFy-5) },
+                     CybChrDk(p), CybChrFar(p), L, H, 1.9f*s);
+            }
+            CybTorso(px,R, 62f, 66f, 14f, 17f, p, true, s, L, H);
+            CybVisor(px,R, hx, 98f, p, CybHot, s, L, H);
+            if (!rigged) {
             P3DLimb(px,R, 63f*s,80f*s, nEx*s,nEy*s, 5.6f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.8f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
+            }
             float bx = 64f + (q == 4 ? 14f : (q == 3 ? 3f : 9f));
+            // Equal outward offset on every segment, not a per-index ramp -- the old
+            // (i-1)*spread sheared the shield into a diagonal slash (top-left, bottom-right)
+            // instead of a symmetric fan, which read as the shield's own energy line being
+            // "not horizontal and glitched."
             float spread = Atk(q) ? 3f : 0f;
             for (int i = 0; i < 3; i++)
             {
-                float yy = 44f + i*18f, off = (i-1)*spread;
-                P3DPlate(px,R, new[]{ V(bx-13+off,yy), V(bx+13+off,yy+1),
+                float yy = 44f + i*18f, off = spread;
+                P3DPlateLit(px,R, new[]{ V(bx-13+off,yy), V(bx+13+off,yy+1),
                                       V(bx+13+off,yy+16), V(bx-13+off,yy+15) },
-                         CybChrHi(p), CybChr(p), 2.0f*s);
-                CybPanelGap(px,R, (bx-12+off)*s,(yy+15.5f)*s, (bx+12+off)*s,(yy+16.5f)*s, i==1, s);
+                         CybChrHi(p), CybChr(p), L, H, 2.0f*s);
+                CybPanelGap(px,R, (bx-12+off)*s,(yy+16f)*s, (bx+12+off)*s,(yy+16f)*s, i==1, s);
             }
             DrawLineR(px,R, (bx-11f)*s,60f*s, (bx-11f)*s,90f*s, 2.2f*s,
                       new Color(CybHot.r, CybHot.g, CybHot.b, 0.75f));
@@ -3925,13 +5359,16 @@ namespace NW.App
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float beat = q == 1 ? 4f : (q == 2 ? -4f : (Atk(q) ? 7f : 0f));
             float dv = q == 4 ? -4f : 0f;
-            P3DPlate(px,R, new[]{ V(30,56+dv), V(84,62+dv), V(92,54+dv), V(36,46+dv) },
-                     CybChrHi(p), CybChr(p), 2.4f*s);
+            P3DPlateLit(px,R, new[]{ V(30,56+dv), V(84,62+dv), V(92,54+dv), V(36,46+dv) },
+                     CybChrHi(p), CybChr(p), L, H, 2.4f*s);
             CybPanelGap(px,R, 38f*s,(52f+dv)*s, 86f*s,(58f+dv)*s, true, s);
-            P3DPlate(px,R, new[]{ V(52,62+dv), V(70,66+dv), V(64,78+dv-beat*0.3f), V(50,72+dv) },
-                     CybChrDk(p), CybChrFar(p), 2.0f*s);
-            P3DPlate(px,R, new[]{ V(52,46+dv), V(70,50+dv), V(64,36+dv+beat*0.3f), V(50,42+dv) },
-                     CybChrDk(p), CybChrFar(p), 2.0f*s);
+            // Single tapered swept-wing polygon per side (root wide at the fuselage, tail-swept,
+            // pointed tip) instead of two small diamond plates that crossed each other into an
+            // X near the body -- these now read as an aircraft's wings, not blades.
+            P3DPlateLit(px,R, new[]{ V(66,60+dv), V(48,55+dv), V(38,78+dv-beat) },
+                     CybChrDk(p), CybChrFar(p), L, H, 2.0f*s);
+            P3DPlateLit(px,R, new[]{ V(66,48+dv), V(48,53+dv), V(38,30+dv+beat) },
+                     CybChrDk(p), CybChrFar(p), L, H, 2.0f*s);
             FillCircleR(px,R, 84f*s, (60f+dv)*s, 4.0f*s, CybCold);
             P3DEllipseGlow(px,R, 84f*s, (60f+dv)*s, 13f*s, 10f*s,
                            new Color(CybCold.r, CybCold.g, CybCold.b, 0.45f));
@@ -3953,32 +5390,34 @@ namespace NW.App
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float sway = q == 1 ? 3f : (q == 2 ? -3f : (Atk(q) ? 5f : 0f));
             float bob  = q == 1 ? 2f : (q == 2 ? -2f : 0f);
-            float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
-            float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
             float nEx = SideJoints[q,8]+sway, nEy = SideJoints[q,9]+bob;
             float nHx = SideJoints[q,10]+sway, nHy = SideJoints[q,11]+bob;
             float fEx = SideJoints[q,12]+sway, fEy = SideJoints[q,13]+bob;
             float hx = (q == 5 ? 60f : 65f) + sway;
             bool cast = Atk(q);
-            P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 4.6f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
-            P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 5.2f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+8,fFy+3), V(fFx+6,fFy-4), V(fFx-6,fFy-4) },
-                     CybChrDk(p), CybChrFar(p), 1.7f*s);
-            P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+8,nFy+3), V(nFx+6,nFy-4), V(nFx-6,nFy-4) },
-                     CybChrDk(p), CybChrFar(p), 1.7f*s);
+            // This unit hovers -- it has no legs. The two P3DLimb capsules and matching foot
+            // plates that used to sit here drew directly from the shared leg-joint table with
+            // no attachment to the body at all: a real, pre-existing disconnected floating
+            // shape near the ground, visible in every pose since before this session.
             P3DLimb(px,R, (56f+sway)*s,(84f+bob)*s, fEx*s,fEy*s, 5.0f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
-            CybTorso(px,R, 63f+sway, 68f, 11f, 17f, p, true, s);
-            P3DPlate(px,R, new[]{ V(52+sway,72), V(60+sway,74), V(58+sway,90), V(50+sway,88) },
-                     CybChrDk(p), CybChrFar(p), 2.0f*s);
+            CybTorso(px,R, 63f+sway, 68f, 11f, 17f, p, true, s, L, H);
+            P3DPlateLit(px,R, new[]{ V(52+sway,72), V(60+sway,74), V(58+sway,90), V(50+sway,88) },
+                     CybChrDk(p), CybChrFar(p), L, H, 2.0f*s);
+            // Hover base: a deliberate projected ring instead of leaving the space beneath the
+            // cloak as unlit negative space (there are no legs — this unit hovers by design).
+            P3DEllipseGlow(px,R, (63f+sway)*s, 90f*s, 16f*s, 5f*s,
+                           new Color(CybHot.r, CybHot.g, CybHot.b, 0.28f));
+            DrawRingR(px,R, (63f+sway)*s, 92f*s, 12f*s, 1.5f*s,
+                      new Color(CybHot.r, CybHot.g, CybHot.b, 0.55f));
             P3DLimb(px,R, (64f+sway)*s,(84f+bob)*s, nEx*s,nEy*s, 5.0f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.4f*s, CybChr(p), 0.6f,0.5f, L,H,fillL);
-            CybVisor(px,R, hx, 102f+bob, p, CybHot, s);
-            float dkx = nHx + 14f*s, dky = nHy + (cast ? 8f : 2f)*s;
-            CybCoolant(px,R, new[]{ V(54+sway,86), new Vector2(nHx-4f*s, nHy+10f*s),
+            CybVisor(px,R, hx, 102f+bob, p, CybHot, s, L, H);
+            float dkx = nHx*s + 14f*s, dky = nHy*s + (cast ? 8f : 2f)*s;
+            CybCoolant(px,R, new[]{ V(54+sway,86), new Vector2(nHx*s-4f*s, nHy*s+10f*s),
                                     new Vector2(dkx-6f*s, dky+2f*s) }, CybHot, s);
-            P3DPlate(px,R, new[]{ new Vector2(dkx-9f*s,dky+7f*s), new Vector2(dkx+9f*s,dky+8f*s),
+            P3DPlateLit(px,R, new[]{ new Vector2(dkx-9f*s,dky+7f*s), new Vector2(dkx+9f*s,dky+8f*s),
                                   new Vector2(dkx+8f*s,dky-5f*s), new Vector2(dkx-8f*s,dky-6f*s) },
-                     CybChrHi(p), CybChr(p), 2.0f*s);
+                     CybChrHi(p), CybChr(p), L, H, 2.0f*s);
             for (int k = 0; k < 3; k++)
                 DrawLineR(px,R, dkx-6f*s, dky+(-2f+k*3.4f)*s, dkx+6f*s, dky+(-2f+k*3.4f)*s, 1.3f*s,
                           new Color(CybHot.r, CybHot.g, CybHot.b, cast ? (0.9f-k*0.16f) : 0.32f));
@@ -3992,11 +5431,15 @@ namespace NW.App
         }
 
         // ── TITAN — visibly ASSEMBLED from three segments, sensor block for a head ─
+        // part 3 = torso/head only, no legs or arms -- see _rigs["cybtitan"] below. Last in
+        // the rig-priority queue: the biggest unit on screen, so the old hard knee-swap was
+        // the most visible instance of the whole-roster animation problem.
         static void P3DBuildCybTitan(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
                                      int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx, nKy, nFx, nFy, fKx, fKy, fFx, fFy, rock;
             if (q == 1)      { nKx= 20; nKy=26; nFx= 32; nFy= 8; fKx=-18; fKy=24; fFx=-28; fFy=8; rock= 3f; }
@@ -4009,40 +5452,46 @@ namespace NW.App
             else             { nKx= 12; nKy=25; nFx= 14; nFy= 8; fKx=-12; fKy=25; fFx=-14; fFy=8; rock= 0f; }
             float hdx = q == 3 ? -12f : (q == 4 ? 10f : 0f), hx = 64f + hdx;
             var far = new P3DP { body = new Color(p.body.r*0.4f, p.body.g*0.4f, p.body.b*0.4f) };
+            if (!rigged) {
             P3DLimb(px,R, 58f*s,44f*s, (64f+fKx)*s,fKy*s, 9.0f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, (64f+fKx)*s,fKy*s, (64f+fFx)*s,fFy*s, 7.6f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, (64f+fKx)*s, fKy*s, 25f, 16f, 4.6f, far, s);
-            P3DPlate(px,R, new[]{ V(64+fFx-10,fFy+7), V(64+fFx+10,fFy+7), V(64+fFx+8,fFy-6), V(64+fFx-8,fFy-6) },
-                     CybChrFar(p), CybChrDk(p), 2f*s);
+            P3DPlateLit(px,R, new[]{ V(64+fFx-10,fFy+7), V(64+fFx+10,fFy+7), V(64+fFx+8,fFy-6), V(64+fFx-8,fFy-6) },
+                     CybChrFar(p), CybChrDk(p), L, H, 2f*s);
             P3DLimb(px,R, 70f*s,44f*s, (64f+nKx)*s,nKy*s, 10.5f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, (64f+nKx)*s,nKy*s, (64f+nFx)*s,nFy*s, 8.8f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, (64f+nKx)*s, nKy*s, 25f, 19f, 5.4f, p, s);
-            P3DPlate(px,R, new[]{ V(64+nFx-12,nFy+8), V(64+nFx+12,nFy+8), V(64+nFx+9,nFy-7), V(64+nFx-9,nFy-7) },
-                     CybChr(p), CybChrDk(p), 2.2f*s);
-            P3DPlate(px,R, new[]{ V(hx-20,44), V(hx+20,44), V(hx+19,62), V(hx-19,62) },
-                     CybChrHi(p), CybChr(p), 2.3f*s);
+            P3DPlateLit(px,R, new[]{ V(64+nFx-12,nFy+8), V(64+nFx+12,nFy+8), V(64+nFx+9,nFy-7), V(64+nFx-9,nFy-7) },
+                     CybChr(p), CybChrDk(p), L, H, 2.2f*s);
+            }
+            P3DPlateLit(px,R, new[]{ V(hx-20,44), V(hx+20,44), V(hx+19,62), V(hx-19,62) },
+                     CybChrHi(p), CybChr(p), L, H, 2.3f*s);
             CybPanelGap(px,R, (hx-19f)*s,63f*s, (hx+19f)*s,63f*s, true, s);
-            P3DPlate(px,R, new[]{ V(hx-19,64), V(hx+19,64), V(hx+18,84), V(hx-18,84) },
-                     CybChrHi(p), CybChr(p), 2.3f*s);
+            P3DPlateLit(px,R, new[]{ V(hx-19,64), V(hx+19,64), V(hx+18,84), V(hx-18,84) },
+                     CybChrHi(p), CybChr(p), L, H, 2.3f*s);
             CybPanelGap(px,R, (hx-18f)*s,85f*s, (hx+18f)*s,85f*s, true, s);
-            P3DPlate(px,R, new[]{ V(hx-18,86), V(hx+18,86), V(hx+15,104), V(hx-15,104) },
-                     CybChrHi(p), CybChr(p), 2.3f*s);
+            P3DPlateLit(px,R, new[]{ V(hx-18,86), V(hx+18,86), V(hx+15,104), V(hx-15,104) },
+                     CybChrHi(p), CybChr(p), L, H, 2.3f*s);
             CybCoolant(px,R, new[]{ V(hx-16,48), V(hx-10,70), V(hx+10,78), V(hx+15,100) }, CybHot, s);
-            P3DPlate(px,R, new[]{ V(hx-30,98), V(hx-10,104), V(hx-8,86), V(hx-26,82) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
-            P3DPlate(px,R, new[]{ V(hx+10,104), V(hx+30,98), V(hx+26,82), V(hx+8,86) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(hx-30,98), V(hx-10,104), V(hx-8,86), V(hx-26,82) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(hx+10,104), V(hx+30,98), V(hx+26,82), V(hx+8,86) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             float fex = hx - (q == 4 ? 20f : 12f);
+            if (!rigged) {
             P3DLimb(px,R, (hx-16f)*s,94f*s, fex*s,78f*s, 9.5f*s, CybChrFar(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(fex-9,84), V(fex+7,86), V(fex+9,72), V(fex-7,70) },
-                     CybChrFar(p), CybChrDk(p), 2f*s);
+            P3DPlateLit(px,R, new[]{ V(fex-9,84), V(fex+7,86), V(fex+9,72), V(fex-7,70) },
+                     CybChrFar(p), CybChrDk(p), L, H, 2f*s);
+            }
             float ex = hx + (q == 4 ? 26f : (q == 3 ? -14f : 10f)), ey = 78f + (q == 4 ? -6f : 0f);
+            if (!rigged) {
             P3DLimb(px,R, (hx+16f)*s,94f*s, ex*s,ey*s, 10.5f*s, CybChrDk(p), 0.6f,0.5f, L,H,fillL);
             CybActuator(px,R, (hx+16f)*s, 94f*s, 0f, 14f, 4.4f, p, s);
-            P3DPlate(px,R, new[]{ V(ex-9,ey+7), V(ex+9,ey+9), V(ex+11,ey-6), V(ex-7,ey-8) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(ex-9,ey+7), V(ex+9,ey+9), V(ex+11,ey-6), V(ex-7,ey-8) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             DrawLineR(px,R, (ex-5f)*s,(ey+2f)*s, (ex+9f)*s,(ey+3f)*s, 2.6f*s,
                       new Color(CybHot2.r, CybHot2.g, CybHot2.b, 0.9f));
+            }
             if (q == 4)
             {
                 P3DEllipseGlow(px,R, (ex+22f)*s, ey*s, 24f*s, 20f*s,
@@ -4052,8 +5501,8 @@ namespace NW.App
                               new Color(CybHot2.r, CybHot2.g, CybHot2.b, 0.55f-k*0.14f));
             }
             float sbx = hx + rock*0.4f;
-            P3DPlate(px,R, new[]{ V(sbx-11,106), V(sbx+11,107), V(sbx+9,118), V(sbx-9,117) },
-                     CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(sbx-11,106), V(sbx+11,107), V(sbx+9,118), V(sbx-9,117) },
+                     CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             DrawLineR(px,R, (sbx-9f)*s,112f*s, (sbx+9f)*s,113f*s, 3.0f*s, CybHot);
             P3DEllipseGlow(px,R, sbx*s, 112f*s, 16f*s, 7f*s, new Color(CybHot.r,CybHot.g,CybHot.b,0.45f));
         }
@@ -4067,9 +5516,9 @@ namespace NW.App
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             bool chg = Atk(q);
             float rec = q == 4 ? -5f : 0f;
-            P3DPlate(px,R, new[]{ V(44,10), V(84,10), V(80,24), V(48,24) }, CybChrDk(p), CybChrFar(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(44,10), V(84,10), V(80,24), V(48,24) }, CybChrDk(p), CybChrFar(p), L, H, 2.2f*s);
             CybPanelGap(px,R, 48f*s,22f*s, 80f*s,22f*s, false, s);
-            P3DPlate(px,R, new[]{ V(52,24), V(76,24), V(74,44), V(54,44) }, CybChrHi(p), CybChr(p), 2.3f*s);
+            P3DPlateLit(px,R, new[]{ V(52,24), V(76,24), V(74,44), V(54,44) }, CybChrHi(p), CybChr(p), L, H, 2.3f*s);
             CybPanelGap(px,R, 54f*s,38f*s, 74f*s,39f*s, true, s);
             CybActuator(px,R, 64f*s, 46f*s, 0f, 18f, 5.0f, p, s);
             float ang = q == 3 ? 12f : (q == 4 ? -6f : 2f);
@@ -4083,7 +5532,7 @@ namespace NW.App
                                 (62f+rec)*s+dx*30f*s, oy*s+dy*30f*s, 1.8f*s,
                           new Color(CybHot.r, CybHot.g, CybHot.b, chg ? 0.95f : 0.40f));
             }
-            P3DPlate(px,R, new[]{ V(54,46), V(74,48), V(72,62), V(56,60) }, CybChrHi(p), CybChr(p), 2.2f*s);
+            P3DPlateLit(px,R, new[]{ V(54,46), V(74,48), V(72,62), V(56,60) }, CybChrHi(p), CybChr(p), L, H, 2.2f*s);
             FillCircleR(px,R, 60f*s, 54f*s, 3.0f*s, new Color(CybHot.r, CybHot.g, CybHot.b, chg?1f:0.6f));
             P3DEllipseGlow(px,R, 60f*s, 54f*s, (chg?15f:9f)*s, (chg?13f:8f)*s,
                            new Color(CybHot.r, CybHot.g, CybHot.b, chg?0.5f:0.28f));
@@ -4099,8 +5548,10 @@ namespace NW.App
         static void P3DBuildSynBot(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
-            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 ? -3f : 0f));
+            // Pose8, same reasoning as Speeder/Cruiser -- q1/q6 the bob's extremes, q2/q7 its
+            // shared middle crossing.
+            int q = Pose8(pose);
+            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 || q == 7 ? 0f : (q == 6 ? -3f : 0f)));
             float spin = (q % 2 == 1) ? 45f : 0f;
             SynGridFloor(px, R, 64f, 14f, 18f, 3, s);
             for (int i = 0; i < 3; i++)
@@ -4128,10 +5579,15 @@ namespace NW.App
         }
 
         // ── RACER (trooper) — jacket as a flat slab with a sunset printed on it ──
-        static void P3DBuildSynRacer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["synracer"] below. Same rig
+        // technique as Cyber's Lancer; this unit's joints happen to share Lancer's exact
+        // coordinates and radii, so the RigDef is a direct copy.
+        static void P3DBuildSynRacer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
             float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
@@ -4139,6 +5595,7 @@ namespace NW.App
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13], fHx = SideJoints[q,14], fHy = SideJoints[q,15];
             float hx = q == 5 ? 60f : 66f;
             SynGridFloor(px, R, 64f, 14f, 26f, 4, s);
+            if (!rigged) {
             P3DLimb(px,R, 56f*s,84f*s, fEx*s,fEy*s, 4.8f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fEx*s,fEy*s, fHx*s,fHy*s, 4.2f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 63f*s,56f*s, fKx*s,fKy*s, 6.6f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
@@ -4150,30 +5607,44 @@ namespace NW.App
             P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+9,nFy+3), V(nFx+7,nFy-4), V(nFx-6,nFy-4) },
                      SynChr(p), SynChrDk(p), 1.7f*s);
             SynTube(px,R, (nFx-6)*s,(nFy-2)*s, (nFx+8)*s,(nFy-2)*s, SynCya, s);
+            }
             SynHorizon(px,R, new[]{ V(52,88), V(74,88), V(76,68), V(70,52), V(56,52), V(50,68) }, true, s);
             SynTube(px,R, 52f*s,88f*s, 74f*s,88f*s, SynMag, s);
             SynTube(px,R, 50f*s,68f*s, 56f*s,52f*s, SynCya, s);
             SynTube(px,R, 70f*s,52f*s, 76f*s,68f*s, SynCya, s);
+            if (!rigged) {
             P3DLimb(px,R, 64f*s,84f*s, nEx*s,nEy*s, 5.2f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.6f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(hx-10,114), V(hx+10,115), V(hx+9,133), V(hx-9,132) },
+            }
+            // Head plate's bottom edge lands exactly on the torso top (88, see the SynHorizon
+            // call above) -- it used to sit at y=114, floating 26 units above the torso with
+            // nothing drawn in between (no neck), which is where the visible head/body gap
+            // came from. Cyber's CybVisor does the same bottom-meets-torso-top alignment.
+            P3DPlate(px,R, new[]{ V(hx-10,88), V(hx+10,89), V(hx+9,107), V(hx-9,106) },
                      SynChrHi(p), SynChr(p), 2.2f*s);
-            SynTube(px,R, (hx-9)*s,124f*s, (hx+9)*s,125f*s, SynCya, s);
-            P3DEllipseGlow(px,R, hx*s,124f*s, 16f*s,6f*s, new Color(SynCya.r,SynCya.g,SynCya.b,0.40f));
+            SynTube(px,R, (hx-9)*s,98f*s, (hx+9)*s,99f*s, SynCya, s);
+            P3DEllipseGlow(px,R, hx*s,98f*s, 16f*s,6f*s, new Color(SynCya.r,SynCya.g,SynCya.b,0.40f));
+            if (!rigged) {
             float sw = q == 4 ? 52f : (q == 3 ? -56f : -16f);
             float rad = sw * Mathf.Deg2Rad;
             float dx = -Mathf.Sin(rad), dy = Mathf.Cos(rad);
-            SynTube(px,R, (nHx - dx*10f*s), (nHy - dy*10f*s), (nHx + dx*36f*s), (nHy + dy*36f*s), SynMag, s);
+            SynTube(px,R, (nHx*s - dx*10f*s), (nHy*s - dy*10f*s), (nHx*s + dx*36f*s), (nHy*s + dy*36f*s), SynMag, s);
             if (q == 4)
-                P3DEllipseGlow(px,R, nHx + dx*40f*s, nHy + dy*40f*s, 16f*s, 14f*s,
+                P3DEllipseGlow(px,R, nHx*s + dx*40f*s, nHy*s + dy*40f*s, 16f*s, 14f*s,
                                new Color(SynMag.r,SynMag.g,SynMag.b,0.55f));
+            }
         }
 
         // ── LASER (sniper) — the weapon is a beam in an open frame, no barrel ────
-        static void P3DBuildSynLaser(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only -- see _rigs["synlaser"] below. Joints/radii match Cyber's
+        // Railgun exactly, so the RigDef is a direct copy; the rifle re-bakes into the near-arm
+        // limb segment the same way Railgun's does.
+        static void P3DBuildSynLaser(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
             float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
@@ -4181,6 +5652,7 @@ namespace NW.App
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13];
             float hx = q == 5 ? 61f : 66f;
             SynGridFloor(px, R, 64f, 14f, 24f, 4, s);
+            if (!rigged) {
             P3DLimb(px,R, 56f*s,82f*s, fEx*s,fEy*s, 4.2f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 63f*s,54f*s, fKx*s,fKy*s, 5.8f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 5.0f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
@@ -4190,16 +5662,22 @@ namespace NW.App
                      SynChrDk(p), SynChrFar(p), 1.6f*s);
             P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+8,nFy+3), V(nFx+6,nFy-4), V(nFx-6,nFy-4) },
                      SynChrDk(p), SynChrFar(p), 1.6f*s);
+            }
             SynHorizon(px,R, new[]{ V(54,84), V(74,84), V(76,66), V(69,52), V(57,52), V(52,66) }, true, s);
             SynTube(px,R, 52f*s,66f*s, 57f*s,52f*s, SynMag, s);
             SynTube(px,R, 69f*s,52f*s, 76f*s,66f*s, SynMag, s);
+            if (!rigged) {
             P3DLimb(px,R, 64f*s,82f*s, nEx*s,nEy*s, 4.8f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.2f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(hx-9,113), V(hx+9,114), V(hx+8,130), V(hx-8,129) },
+            }
+            // Bottom edge on the torso top (84, see SynHorizon above) -- same head/body gap
+            // fix as Racer, this unit's own offset (torso top sits 4 lower than Racer's).
+            P3DPlate(px,R, new[]{ V(hx-9,84), V(hx+9,85), V(hx+8,101), V(hx-8,100) },
                      SynChrHi(p), SynChr(p), 2.1f*s);
-            SynTube(px,R, (hx-8)*s,121f*s, (hx+8)*s,122f*s, SynMag, s);
+            SynTube(px,R, (hx-8)*s,92f*s, (hx+8)*s,93f*s, SynMag, s);
+            if (!rigged) {
             bool open = Atk(q);
-            float gx = nHx + 8f*s, gy = nHy;
+            float gx = nHx*s + 8f*s, gy = nHy*s;
             SynTube(px,R, gx, gy+14f*s, gx+6f*s, gy, SynCya, s);
             SynTube(px,R, gx+6f*s, gy, gx, gy-14f*s, SynCya, s);
             FillCircleR(px,R, gx+8f*s, gy, (open?4.4f:2.6f)*s, new Color(1f,0.98f,1f));
@@ -4212,6 +5690,7 @@ namespace NW.App
                 for (int k = 0; k < 3; k++)
                     DrawRingR(px,R, gx+(30f+k*24f)*s, gy, (4f+k*2.4f)*s, 1.4f*s,
                               new Color(SynCya.r,SynCya.g,SynCya.b, 0.5f-k*0.12f));
+            }
             }
         }
 
@@ -4254,10 +5733,15 @@ namespace NW.App
         }
 
         // ── BOUNCER (shield-bot) — a barrier you can SEE THROUGH, lit on the edge ──
-        static void P3DBuildSynBouncer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only -- see _rigs["synbouncer"] below. Joints/radii match
+        // Cyber's Bastion exactly; the barrier itself stays on the body layer (body-space
+        // `bx`, not hand-tied), same reasoning as Bastion's shield.
+        static void P3DBuildSynBouncer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
             float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
@@ -4265,6 +5749,7 @@ namespace NW.App
             float fEx = SideJoints[q,12], fEy = SideJoints[q,13];
             float hx = q == 5 ? 58f : 63f;
             SynGridFloor(px, R, 64f, 14f, 28f, 4, s);
+            if (!rigged) {
             P3DLimb(px,R, 55f*s,80f*s, fEx*s,fEy*s, 5.4f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, 62f*s,52f*s, fKx*s,fKy*s, 7.6f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 6.6f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
@@ -4274,14 +5759,19 @@ namespace NW.App
                      SynChrDk(p), SynChrFar(p), 1.8f*s);
             P3DPlate(px,R, new[]{ V(nFx-8,nFy+4), V(nFx+9,nFy+4), V(nFx+8,nFy-5), V(nFx-7,nFy-5) },
                      SynChrDk(p), SynChrFar(p), 1.8f*s);
+            }
             SynHorizon(px,R, new[]{ V(50,84), V(76,84), V(78,64), V(72,50), V(54,50), V(48,64) }, true, s);
             SynTube(px,R, 48f*s,64f*s, 54f*s,50f*s, SynCya, s);
             SynTube(px,R, 72f*s,50f*s, 78f*s,64f*s, SynCya, s);
-            P3DPlate(px,R, new[]{ V(hx-11,109), V(hx+11,110), V(hx+10,125), V(hx-10,124) },
+            // Bottom edge on the torso top (84, see SynHorizon above) -- same head/body gap
+            // fix as Racer/Laser.
+            P3DPlate(px,R, new[]{ V(hx-11,84), V(hx+11,85), V(hx+10,100), V(hx-10,99) },
                      SynChrHi(p), SynChr(p), 2.2f*s);
-            SynTube(px,R, (hx-9)*s,117f*s, (hx+9)*s,118f*s, SynMag, s);
+            SynTube(px,R, (hx-9)*s,92f*s, (hx+9)*s,93f*s, SynMag, s);
+            if (!rigged) {
             P3DLimb(px,R, 63f*s,80f*s, nEx*s,nEy*s, 5.6f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.8f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
+            }
             float bx = 64f + (q == 4 ? 14f : (q == 3 ? 3f : 9f));
             SynWire(px,R, (bx-14f)*s,36f*s, (bx+14f)*s,92f*s, 7, 3,
                     new Color(SynCya.r,SynCya.g,SynCya.b,0.45f), s);
@@ -4297,9 +5787,14 @@ namespace NW.App
         static void P3DBuildSynSpeeder(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, matching Cruiser's own already-correct pattern: q1/q6 are the bob's two
+            // extremes, q2/q7 its shared zero-crossing -- a real sine bob passes through the
+            // same middle point on both the way up and the way down, so having them equal
+            // isn't the "two poses toggling" bug, it's what a smooth symmetric bob looks like
+            // sampled at 4 points instead of 2.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            float beat = q == 1 ? 4f : (q == 2 ? -4f : (Atk(q) ? 7f : 0f));
+            float beat = q == 1 ? 4f : (q == 2 || q == 7 ? 0f : (q == 6 ? -4f : (Atk(q) ? 7f : 0f)));
             float dv = q == 4 ? -4f : 0f;
             SynGridFloor(px, R, 64f, 16f, 30f, 5, s);
             SynHorizon(px,R, new[]{ V(26,58+dv), V(86,64+dv), V(92,54+dv), V(34,48+dv) }, true, s);
@@ -4340,20 +5835,16 @@ namespace NW.App
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float sway = q == 1 ? 3f : (q == 2 ? -3f : (Atk(q) ? 5f : 0f));
             float bob  = q == 1 ? 2f : (q == 2 ? -2f : 0f);
-            float nKx = SideJoints[q,0], nKy = SideJoints[q,1], nFx = SideJoints[q,2], nFy = SideJoints[q,3];
-            float fKx = SideJoints[q,4], fKy = SideJoints[q,5], fFx = SideJoints[q,6], fFy = SideJoints[q,7];
             float nEx = SideJoints[q,8] + sway, nEy = SideJoints[q,9] + bob;
             float nHx = SideJoints[q,10] + sway, nHy = SideJoints[q,11] + bob;
             float fEx = SideJoints[q,12] + sway, fEy = SideJoints[q,13] + bob;
             float hx = (q == 5 ? 60f : 65f) + sway;
             bool cast = Atk(q);
             SynGridFloor(px, R, 64f, 14f, 24f, 4, s);
-            P3DLimb(px,R, fKx*s,fKy*s, fFx*s,fFy*s, 4.6f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
-            P3DLimb(px,R, nKx*s,nKy*s, nFx*s,nFy*s, 5.2f*s, SynChrDk(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(fFx-7,fFy+3), V(fFx+8,fFy+3), V(fFx+6,fFy-4), V(fFx-6,fFy-4) },
-                     SynChrDk(p), SynChrFar(p), 1.6f*s);
-            P3DPlate(px,R, new[]{ V(nFx-7,nFy+3), V(nFx+8,nFy+3), V(nFx+6,nFy-4), V(nFx-6,nFy-4) },
-                     SynChrDk(p), SynChrFar(p), 1.6f*s);
+            // This unit hovers -- it has no legs. Same pre-existing bug as Cyber's Cipher: two
+            // P3DLimb capsules and matching foot plates were drawn straight from the shared
+            // leg-joint table with no attachment to the (much higher, sway/bob-adjusted) body
+            // at all -- a disconnected floating shape near the ground in every pose.
             P3DLimb(px,R, (56f+sway)*s,(84f+bob)*s, fEx*s,fEy*s, 5.0f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             SynWire(px,R, (48f+sway)*s,30f*s, (80f+sway)*s,86f*s, 7, 4,
                     new Color(SynMag.r,SynMag.g,SynMag.b,0.42f), s);
@@ -4362,13 +5853,15 @@ namespace NW.App
             SynTube(px,R, (80f+sway)*s,86f*s, (76f+sway)*s,30f*s, SynCya, s);
             P3DLimb(px,R, (64f+sway)*s,(84f+bob)*s, nEx*s,nEy*s, 5.0f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, nEx*s,nEy*s, nHx*s,nHy*s, 4.4f*s, SynChr(p), 0.6f,0.5f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(hx-9,113), V(hx+9,114), V(hx+8,130), V(hx-8,129) },
+            // Bottom edge on the torso top (86, see SynHorizon above) -- same head/body gap
+            // fix as Racer/Laser/Bouncer.
+            P3DPlate(px,R, new[]{ V(hx-9,86), V(hx+9,87), V(hx+8,103), V(hx-8,102) },
                      SynChrHi(p), SynChr(p), 2.1f*s);
-            SynTube(px,R, (hx-8)*s,121f*s, (hx+8)*s,122f*s, SynCya, s);
+            SynTube(px,R, (hx-8)*s,94f*s, (hx+8)*s,95f*s, SynCya, s);
             float tilt = (cast ? -14f : -4f) * Mathf.Deg2Rad;
             float dx = Mathf.Cos(tilt), dy = Mathf.Sin(tilt);
-            float ax = nHx - dx*8f*s,  ay = nHy - dy*8f*s;
-            float bx = nHx + dx*34f*s, by = nHy + dy*34f*s;
+            float ax = nHx*s - dx*8f*s,  ay = nHy*s - dy*8f*s;
+            float bx = nHx*s + dx*34f*s, by = nHy*s + dy*34f*s;
             float pvx = -dy*7f*s, pvy = dx*7f*s;
             P3DPlate(px,R, new[]{ new Vector2(ax+pvx,ay+pvy), new Vector2(bx+pvx,by+pvy),
                                   new Vector2(bx-pvx,by-pvy), new Vector2(ax-pvx,ay-pvy) },
@@ -4391,11 +5884,14 @@ namespace NW.App
         }
 
         // ── OBELISK (titan) — a geometric solid. No head, no hands, no anatomy ──
+        // part 3 = torso/head only -- see _rigs["synobelisk"] below. Joints/radii match
+        // Cyber's Atlas exactly.
         static void P3DBuildSynObelisk(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
                                        int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             float nKx, nKy, nFx, nFy, fKx, fKy, fFx, fFy, rock;
             if (q == 1)      { nKx= 20; nKy=26; nFx= 32; nFy= 8; fKx=-18; fKy=24; fFx=-28; fFy=8; rock= 3f; }
@@ -4408,6 +5904,7 @@ namespace NW.App
             else             { nKx= 12; nKy=25; nFx= 14; nFy= 8; fKx=-12; fKy=25; fFx=-14; fFy=8; rock= 0f; }
             float hdx = q == 3 ? -12f : (q == 4 ? 10f : 0f), hx = 64f + hdx;
             SynGridFloor(px, R, 64f, 14f, 36f, 5, s);
+            if (!rigged) {
             P3DLimb(px,R, 58f*s,44f*s, (64f+fKx)*s,fKy*s, 9.0f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DLimb(px,R, (64f+fKx)*s,fKy*s, (64f+fFx)*s,fFy*s, 7.6f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DPlate(px,R, new[]{ V(64+fFx-10,fFy+7), V(64+fFx+10,fFy+7), V(64+fFx+8,fFy-6), V(64+fFx-8,fFy-6) },
@@ -4416,6 +5913,7 @@ namespace NW.App
             P3DLimb(px,R, (64f+nKx)*s,nKy*s, (64f+nFx)*s,nFy*s, 8.8f*s, SynChrDk(p), 0.6f,0.5f, L,H,fillL);
             P3DPlate(px,R, new[]{ V(64+nFx-12,nFy+8), V(64+nFx+12,nFy+8), V(64+nFx+9,nFy-7), V(64+nFx-9,nFy-7) },
                      SynChr(p), SynChrDk(p), 2.2f*s);
+            }
             SynHorizon(px,R, new[]{ V(hx-22,44), V(hx+22,44), V(hx+16,104), V(hx-16,104) }, true, s);
             SynWire(px,R, (hx-20f)*s,46f*s, (hx+20f)*s,102f*s, 6, 3, new Color(1f,1f,1f,0.28f), s);
             SynTube(px,R, (hx-22f)*s,44f*s, (hx+22f)*s,44f*s, SynMag, s);
@@ -4427,14 +5925,18 @@ namespace NW.App
             P3DPlate(px,R, new[]{ V(hx+10,104), V(hx+30,98), V(hx+26,82), V(hx+8,86) },
                      SynChrHi(p), SynChr(p), 2.2f*s);
             float fex = hx - (q == 4 ? 20f : 12f);
+            if (!rigged) {
             P3DLimb(px,R, (hx-16f)*s,94f*s, fex*s,78f*s, 9.5f*s, SynChrFar(p), 0.6f,0.5f, L,H,fillL);
             P3DPlate(px,R, new[]{ V(fex-9,84), V(fex+7,86), V(fex+9,72), V(fex-7,70) },
                      SynChrFar(p), SynChrDk(p), 2f*s);
+            }
             float ex = hx + (q == 4 ? 26f : (q == 3 ? -14f : 10f)), ey = 78f + (q == 4 ? -6f : 0f);
+            if (!rigged) {
             P3DLimb(px,R, (hx+16f)*s,94f*s, ex*s,ey*s, 10.5f*s, SynChrDk(p), 0.6f,0.5f, L,H,fillL);
             P3DPlate(px,R, new[]{ V(ex-9,ey+7), V(ex+9,ey+9), V(ex+11,ey-6), V(ex-7,ey-8) },
                      SynChrHi(p), SynChr(p), 2.2f*s);
             SynTube(px,R, (ex-6f)*s,(ey+2f)*s, (ex+9f)*s,(ey+3f)*s, SynMag, s);
+            }
             if (q == 4)
             {
                 P3DEllipseGlow(px,R, (ex+22f)*s, ey*s, 24f*s, 20f*s,
@@ -4490,10 +5992,12 @@ namespace NW.App
         static void P3DBuildWisp(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: dv/swing are a symmetric drift (Cruiser's bob pattern -- q1/q6 extremes,
+            // q2/q7 share the middle crossing).
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
-            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 ? -3f : 0f));
-            float swing = q == 1 ? 4f : (q == 2 ? -4f : (q == 4 ? 9f : 0f));
+            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 || q == 7 ? 0f : (q == 6 ? -3f : 0f)));
+            float swing = q == 1 ? 4f : (q == 2 || q == 7 ? 0f : (q == 6 ? -4f : (q == 4 ? 9f : 0f)));
             float cx = 64f + swing*0.4f, cy = 70f + dv;
 
             P3DPlate(px,R, new[]{ V(cx-16,cy), V(cx-13,cy+16), V(cx+13,cy+16),
@@ -4674,11 +6178,12 @@ namespace NW.App
         static void P3DBuildSprite(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: dv/wob are a symmetric drift (Cruiser's bob pattern).
+            int q = Pose8(pose);
             Color ribbon = Color.Lerp(ArtCloth, p.body, 0.35f);
-            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 ? -3f : 0f));
+            float dv = q == 4 ? -6f : (q == 1 ? 3f : (q == 2 || q == 7 ? 0f : (q == 6 ? -3f : 0f)));
             float flare = Atk(q) ? 1.6f : 1f;
-            float wob = q == 1 ? 4f : (q == 2 ? -4f : 0f);
+            float wob = q == 1 ? 4f : (q == 2 || q == 7 ? 0f : (q == 6 ? -4f : 0f));
 
             for (int i = 0; i < 3; i++)
             {
@@ -4707,11 +6212,13 @@ namespace NW.App
         }
 
         // ---- SEEKER — Dawn sniper ------------------------------------------------
+        // part 3 = torso/head only, no limbs -- see _rigs["seeker"] below.
         static void P3DBuildSeeker(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color linen = Color.Lerp(ArtCloth, p.body, 0.28f), linenDk = ArtClothDk, wood = ArtLeather;
@@ -4722,6 +6229,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)-6), nH = V(J(10),J(11)-6);
             Vector2 head = V(q == 5 ? 61 : 66, 96);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,(J(13)-6)*s, 4.2f*s, linenSh, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 5.6f*s, linenSh, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 4.8f*s, linenSh, 0.05f,0.2f, L,H,fillL);
@@ -4730,7 +6238,8 @@ namespace NW.App
             foreach (var f in new[]{ fF, nF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+8f*s,f.y+3f*s),
                                       new Vector2(f.x+6f*s,f.y-4f*s), new Vector2(f.x-6f*s,f.y-4f*s) },
-                         wood, new Color(wood.r*0.45f,wood.g*0.45f,wood.b*0.45f), 1.6f);
+                         wood, new Color(wood.r*0.45f,wood.g*0.45f,wood.b*0.45f), 1.6f*s);
+            }
             P3DPlate(px,R, new[]{ V(54,80), V(73,80), V(75,64), V(69,50), V(57,50), V(51,64) },
                      linen, linenDk, 2.2f);
             DawnHem(px,R, new[]{ V(54,51), V(73,51), V(72,46), V(55,46) }, linen, 3, s);
@@ -4744,9 +6253,11 @@ namespace NW.App
                           1.3f*s, new Color(linenDk.r*0.8f, linenDk.g*0.8f, linenDk.b*0.8f));
             P3DEllipseGlow(px,R, head.x+3f*s, head.y+1f*s, 4.0f*s, 2.4f*s,
                 new Color(ArtRune.r, ArtRune.g, ArtRune.b, Atk(q) ? 0.7f : 0.3f));
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 4.6f*s, linen, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.0f*s, linen, 0.05f,0.2f, L,H,fillL);
-            {
+            }
+            if (!rigged) {
                 float draw = q == 3 ? 13f : (q == 4 ? -3f : 6f);
                 float gx = nH.x/s + 9f, gy = nH.y/s;
                 DawnCord(px,R, gx+3f, gy-30f, gx+3f, gy+30f, 6, wood, s);
@@ -4774,10 +6285,14 @@ namespace NW.App
         }
 
         // ---- WARD — Dawn shield-bot ----------------------------------------------
-        static void P3DBuildWard(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["ward"] below. The light barrier is
+        // body-mounted (bx, not a hand joint) so it stays outside the rig either way.
+        static void P3DBuildWard(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color linen = Color.Lerp(ArtCloth, p.body, 0.28f), linenDk = ArtClothDk, wood = ArtLeather;
@@ -4788,6 +6303,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11));
             Vector2 head = V(q == 5 ? 58 : 63, 98);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 5.4f*s, linenSh, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 7.4f*s, linenSh, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 6.4f*s, linenSh, 0.05f,0.2f, L,H,fillL);
@@ -4796,7 +6312,8 @@ namespace NW.App
             foreach (var f in new[]{ nF, fF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-8f*s,f.y+4f*s), new Vector2(f.x+9f*s,f.y+4f*s),
                                       new Vector2(f.x+7f*s,f.y-5f*s), new Vector2(f.x-7f*s,f.y-5f*s) },
-                         wood, new Color(wood.r*0.45f,wood.g*0.45f,wood.b*0.45f), 1.7f);
+                         wood, new Color(wood.r*0.45f,wood.g*0.45f,wood.b*0.45f), 1.7f*s);
+            }
             for (int t = 0; t < 3; t++)
             {
                 float w = 22f - t*4f, y = 82f - t*11f;
@@ -4807,14 +6324,16 @@ namespace NW.App
             DawnHem(px,R, new[]{ V(42,50), V(82,50), V(80,44), V(44,44) }, linen, 4, s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-11f*s,head.y-10f*s), new Vector2(head.x+11f*s,head.y-9f*s),
                                   new Vector2(head.x+10f*s,head.y+7f*s), new Vector2(head.x,head.y+13f*s),
-                                  new Vector2(head.x-11f*s,head.y+7f*s) }, linen, linenDk, 2.2f);
+                                  new Vector2(head.x-11f*s,head.y+7f*s) }, linen, linenDk, 2.2f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-7f*s,head.y-7f*s), new Vector2(head.x+8f*s,head.y-6f*s),
                                   new Vector2(head.x+7f*s,head.y+4f*s), new Vector2(head.x-6f*s,head.y+4f*s) },
-                     new Color(0.07f,0.07f,0.11f), new Color(0.02f,0.02f,0.04f), 1f);
+                     new Color(0.07f,0.07f,0.11f), new Color(0.02f,0.02f,0.04f), 1f*s);
             P3DEllipseGlow(px,R, head.x+3f*s, head.y-1f*s, 2.8f*s, 2.6f*s,
                 new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.9f));
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.6f*s, linen, 0.05f,0.2f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.8f*s, linen, 0.05f,0.2f, L,H,fillL);
+            }
             {
                 // the barrier is LIGHT, not matter -- three translucent planes on a cord frame
                 float bx = 64f + (q == 4 ? 14f : (q == 3 ? 3f : 9f));
@@ -4847,11 +6366,13 @@ namespace NW.App
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, same four-beat fix as Crawler/Tanuki -- legs sweep through mid-stride
+            // positions instead of snapping between two extremes, with a per-leg ripple.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color linen = Color.Lerp(ArtCloth, p.body, 0.26f), linenDk = ArtClothDk, wood = ArtLeather;
             Color woodDk = new Color(wood.r*0.45f, wood.g*0.45f, wood.b*0.45f);
-            float st = q == 1 ? 1f : (q == 2 ? -1f : 0f);
+            float stBase = q == 1 ? 1f : (q == 2 ? 0.33f : (q == 6 ? -0.33f : (q == 7 ? -1f : 0f)));
             float rec = q == 4 ? -6f : (q == 3 ? 3f : 0f);
 
             P3DEllipseGlow(px,R, 64f*s, 15f*s, 34f*s, 7f*s, new Color(0f,0f,0f,0.45f));
@@ -4859,6 +6380,7 @@ namespace NW.App
             for (int i = 0; i < 4; i++)
             {
                 float gx = legs[i,0], dir = legs[i,1];
+                float st = stBase + (i % 2 == 0 ? -0.25f : 0.25f);
                 float kx = gx + dir*8f + st*dir*4f;
                 Color tone = i < 2 ? new Color(wood.r*0.7f, wood.g*0.7f, wood.b*0.7f) : wood;
                 P3DLimb(px,R, gx*s,52f*s, kx*s,32f*s, 3.6f*s, tone, 0.05f,0.2f, L,H,fillL);
@@ -4898,10 +6420,11 @@ namespace NW.App
         static void P3DBuildGlider(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: wing/streamer beat sweeps its range each cycle, same reasoning as Rogue.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color linen = Color.Lerp(ArtCloth, p.body, 0.30f), linenDk = ArtClothDk, wood = ArtLeather;
-            float beat = q == 1 ? 13f : (q == 2 ? -11f : (Atk(q) ? 17f : 0f));
+            float beat = q == 1 ? 13f : (q == 2 ? 5f : (q == 6 ? -4f : (q == 7 ? -11f : (Atk(q) ? 17f : 0f))));
 
             DawnDrape(px,R, 60,62, 26,72+beat*0.6f, 9f,
                 new Color(linenDk.r, linenDk.g, linenDk.b, 0.8f),
@@ -5267,13 +6790,16 @@ namespace NW.App
         static void P3DBuildRivetbot(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: dv is a symmetric hover bob (Cruiser's pattern -- q1/q6 extremes, q2/q7
+            // share the middle crossing); spin is a monotonic sweep (Crawler's pattern -- it
+            // has to keep turning the same way, not oscillate).
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p);
-            float dv = q == 4 ? -6f : (q == 1 ? 2f : (q == 2 ? -2f : 0f));
+            float dv = q == 4 ? -6f : (q == 1 ? 2f : (q == 2 || q == 7 ? 0f : (q == 6 ? -2f : 0f)));
             // 4 vanes are 90 deg apart; half-pitch is 45. At 22 the fan barely moved, and 44
             // on the attack was almost a full half-turn back to where it started.
-            float spin = q == 1 ? 45f : (q == 2 ? -45f : (Atk(q) ? 22f : 0f));
+            float spin = q == 1 ? 45f : (q == 2 ? 15f : (q == 6 ? -15f : (q == 7 ? -45f : (Atk(q) ? 22f : 0f))));
 
             P3DPlate(px,R, new[]{ V(52,58+dv), V(78,60+dv), V(80,74+dv), V(54,72+dv) }, ch, c, 2.3f);
             IndRivets(px,R, 55, 70+dv, 77, 72+dv, 6, cd, s);
@@ -5297,11 +6823,13 @@ namespace NW.App
         }
 
         // ---- GUNNER — Industrial sniper ----------------------------------------
+        // part 3 = torso/head only, no limbs -- see _rigs["gunner"] below.
         static void P3DBuildGunner(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int cc) => SideJoints[q, cc];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -5310,6 +6838,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11));
             Vector2 head = V(q == 5 ? 61 : 66, 102);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 4.4f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 6.2f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 5.4f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -5318,37 +6847,41 @@ namespace NW.App
             foreach (var f in new[]{ fF, nF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
                                       new Vector2(f.x+7f*s,f.y-5f*s), new Vector2(f.x-6f*s,f.y-5f*s) },
-                         cd, cf, 1.7f);
+                         cd, cf, 1.7f*s);
+            }
             P3DPlate(px,R, new[]{ V(53,86), V(74,86), V(76,66), V(69,50), V(57,50), V(51,66) },
-                     ArtCloth, ArtClothDk, 2.2f);
+                     ArtCloth, ArtClothDk, 2.2f*s);
             P3DPlate(px,R, new[]{ V(46,72), V(58,74), V(60,58), V(48,56) },
-                     ArtLeather, new Color(ArtLeather.r*0.5f,ArtLeather.g*0.5f,ArtLeather.b*0.5f), 1.9f);
+                     ArtLeather, new Color(ArtLeather.r*0.5f,ArtLeather.g*0.5f,ArtLeather.b*0.5f), 1.9f*s);
             IndRivets(px,R, 48,70, 58,72, 3, ch, s);
             DrawLineR(px,R, 50f*s,80f*s, 72f*s,72f*s, 2.8f*s, ArtLeather);
-            P3DPlate(px,R, new[]{ V(58,88), V(76,90), V(78,78), V(60,76) }, ch, c, 2.0f);
+            P3DPlate(px,R, new[]{ V(58,88), V(76,90), V(78,78), V(60,76) }, ch, c, 2.0f*s);
             IndRivets(px,R, 61,86, 75,88, 4, cd, s);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.0f*s, ArtCloth, 0.1f,0.2f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.4f*s, ArtCloth, 0.1f,0.2f, L,H,fillL);
+            }
             P3DPlate(px,R, new[]{ new Vector2(head.x-9f*s,head.y-10f*s), new Vector2(head.x+10f*s,head.y-9f*s),
                                   new Vector2(head.x+9f*s,head.y+7f*s), new Vector2(head.x-8f*s,head.y+6f*s) },
-                     c, cd, 2.1f);
+                     c, cd, 2.1f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-7f*s,head.y-2f*s), new Vector2(head.x+9f*s,head.y-1f*s),
                                   new Vector2(head.x+9f*s,head.y+2.6f*s), new Vector2(head.x-7f*s,head.y+1.6f*s) },
-                     new Color(0.10f,0.16f,0.12f), new Color(0.04f,0.07f,0.05f), 1f);
+                     new Color(0.10f,0.16f,0.12f), new Color(0.04f,0.07f,0.05f), 1f*s);
             P3DEllipseGlow(px,R, head.x+3f*s, head.y+0.6f*s, 4.4f*s, 2.0f*s,
                 new Color(0.3f,0.9f,0.6f, Atk(q) ? 0.6f : 0.25f));
             P3DPlate(px,R, new[]{ new Vector2(head.x-13f*s,head.y+1f*s), new Vector2(head.x-8f*s,head.y+3f*s),
                                   new Vector2(head.x-8f*s,head.y-5f*s), new Vector2(head.x-13f*s,head.y-3f*s) },
-                     cd, cf, 1.4f);
+                     cd, cf, 1.4f*s);
+            if (!rigged) {
             float rec = q == 4 ? -9f : (q == 3 ? 3f : 0f);
             DrawLineR(px,R, (nH.x/s-6f+rec)*s, nH.y, (nH.x/s+44f+rec)*s, (nH.y/s+2f)*s, 4.0f*s, cd);
             DrawLineR(px,R, (nH.x/s-6f+rec)*s, nH.y, (nH.x/s+44f+rec)*s, (nH.y/s+2f)*s, 1.5f*s, ch);
             IndRivets(px,R, nH.x/s+4f+rec, nH.y/s-2f, nH.x/s+34f+rec, nH.y/s, 4, ch, s);
             P3DPlate(px,R, new[]{ V(nH.x/s+34+rec, nH.y/s+6), V(nH.x/s+48+rec, nH.y/s+4),
-                                  V(nH.x/s+48+rec, nH.y/s-2), V(nH.x/s+34+rec, nH.y/s-3) }, ch, c, 1.5f);
+                                  V(nH.x/s+48+rec, nH.y/s-2), V(nH.x/s+34+rec, nH.y/s-3) }, ch, c, 1.5f*s);
             P3DPlate(px,R, new[]{ V(nH.x/s-10+rec, nH.y/s+5), V(nH.x/s-2+rec, nH.y/s+5),
                                   V(nH.x/s-2+rec, nH.y/s-4), V(nH.x/s-10+rec, nH.y/s-4) },
-                     ArtLeather, new Color(ArtLeather.r*0.5f,ArtLeather.g*0.5f,ArtLeather.b*0.5f), 1.4f);
+                     ArtLeather, new Color(ArtLeather.r*0.5f,ArtLeather.g*0.5f,ArtLeather.b*0.5f), 1.4f*s);
             if (q == 4)
             {
                 P3DEllipseGlow(px,R, (nH.x/s+56f)*s, (nH.y/s+3f)*s, 14f*s, 9f*s,
@@ -5357,13 +6890,18 @@ namespace NW.App
                     P3DEllipseGlow(px,R, (nH.x/s-14f-b*8f)*s, (nH.y/s-2f)*s, (6f-b)*s, (5f-b)*s,
                         new Color(0.4f,0.4f,0.4f, 0.4f - b*0.1f));
             }
+            }
         }
 
         // ---- BULKHEAD — Industrial shield-bot -----------------------------------
-        static void P3DBuildBulkhead(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["bulkhead"] below. Blast door is
+        // body-mounted (bx, not a hand joint) so it stays outside the rig either way.
+        static void P3DBuildBulkhead(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int cc) => SideJoints[q, cc];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -5373,6 +6911,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11));
             Vector2 head = V(q == 5 ? 58 : 63, 98);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 5.4f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 8.0f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 7.0f*s, cf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -5381,26 +6920,38 @@ namespace NW.App
             foreach (var f in new[]{ nF, fF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-9f*s,f.y+4f*s), new Vector2(f.x+10f*s,f.y+4f*s),
                                       new Vector2(f.x+8f*s,f.y-5f*s), new Vector2(f.x-8f*s,f.y-5f*s) },
-                         cd, cf, 1.8f);
-            P3DPlate(px,R, new[]{ V(50,86), V(76,86), V(78,66), V(72,50), V(54,50), V(48,66) }, ch, c, 2.4f);
+                         cd, cf, 1.8f*s);
+            }
+            P3DPlate(px,R, new[]{ V(50,86), V(76,86), V(78,66), V(72,50), V(54,50), V(48,66) }, ch, c, 2.4f*s);
             IndRivets(px,R, 52,83, 74,83, 6, cd, s);
             IndRivets(px,R, 52,54, 74,54, 6, cd, s);
             IndGauge(px,R, 58, 70, 5.4f, 0.8f, s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-11f*s,head.y-9f*s), new Vector2(head.x+11f*s,head.y-9f*s),
                                   new Vector2(head.x+10f*s,head.y+5f*s), new Vector2(head.x-10f*s,head.y+5f*s) },
-                     ch, c, 2.2f);
+                     ch, c, 2.2f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-8f*s,head.y-2f*s), new Vector2(head.x+9f*s,head.y-2f*s),
                                   new Vector2(head.x+9f*s,head.y+1f*s), new Vector2(head.x-8f*s,head.y+1f*s) },
-                     new Color(0.06f,0.06f,0.07f), new Color(0.02f,0.02f,0.03f), 1f);
+                     new Color(0.06f,0.06f,0.07f), new Color(0.02f,0.02f,0.03f), 1f*s);
             IndRivets(px,R, head.x/s-9, head.y/s+4, head.x/s+9, head.y/s+4, 4, cd, s);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.8f*s, c, p.metallic, p.smoothness, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 5.0f*s, c, p.metallic, p.smoothness, L,H,fillL);
-            float sw = q == 4 ? 16f : (q == 3 ? -9f : 3f);
-            DrawLineR(px,R, nH.x, nH.y, (nH.x/s+sw)*s, (nH.y/s+16f)*s, 3.4f*s, cd);
-            P3DPlate(px,R, new[]{ V(nH.x/s+sw-4, nH.y/s+16), V(nH.x/s+sw+5, nH.y/s+16),
-                                  V(nH.x/s+sw+4, nH.y/s+24), V(nH.x/s+sw-3, nH.y/s+24) }, ch, c, 1.5f);
+            }
             // THE blast door — a plain rectangle, the most boring shape available, on purpose
             float bx = 64f + (q == 4 ? 14f : (q == 3 ? 3f : 9f));
+            // Grip strap: anchored to the shield's OWN position, not offset from the free-
+            // swinging hand joint. It used to drift across the shield's face every walk frame
+            // because the strap's endpoint was `hand + fixed offset` instead of glued to the
+            // shield it's supposed to be holding; deriving it from `bx` keeps it correct
+            // during the attack lunge too, since the shield and grip now move together.
+            // Rigged units draw this on the near-arm segment instead (see BuildLimbSeg) since
+            // nH is only live here when the arm itself isn't a separately-rotating layer.
+            float gx = bx - 13f, gy = 58f;
+            if (!rigged) {
+            DrawLineR(px,R, nH.x, nH.y, gx*s, gy*s, 3.4f*s, cd);
+            P3DPlate(px,R, new[]{ V(gx-4, gy-4), V(gx+5, gy-4),
+                                  V(gx+4, gy+4), V(gx-3, gy+4) }, ch, c, 1.5f*s);
+            }
             P3DPlate(px,R, new[]{ V(bx-15,92), V(bx+15,92), V(bx+15,32), V(bx-15,32) }, c, cd, 2.6f);
             IndHazard(px,R, new[]{ V(bx-14,44), V(bx+14,44), V(bx+14,33), V(bx-14,33) }, 7f, 1.5f);
             IndHazard(px,R, new[]{ V(bx-14,91), V(bx+14,91), V(bx+14,80), V(bx-14,80) }, 7f, 1.5f);
@@ -5501,10 +7052,11 @@ namespace NW.App
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: st is a leg-position sweep (Crawler's pattern), not a symmetric bob.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
-            float st = q == 1 ? 4f : (q == 2 ? -4f : 0f);
+            float st = q == 1 ? 4f : (q == 2 ? 1.3f : (q == 6 ? -1.3f : (q == 7 ? -4f : 0f)));
             float lean = q == 3 ? -8f : (q == 4 ? 8f : 0f);
 
             P3DEllipseGlow(px,R, 64f*s, 16f*s, 36f*s, 8f*s, new Color(0f,0f,0f,0.5f));
@@ -5548,10 +7100,11 @@ namespace NW.App
         static void P3DBuildOrnithopter(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: wing beat sweeps its range each cycle, same reasoning as Rogue/Pigeon.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
-            float beat = q == 1 ? 15f : (q == 2 ? -13f : (Atk(q) ? 19f : 0f));
+            float beat = q == 1 ? 15f : (q == 2 ? 6f : (q == 6 ? -4f : (q == 7 ? -13f : (Atk(q) ? 19f : 0f))));
 
             void Wing(float ax, float ay, float dir, float len, Color tone, float al)
             {
@@ -5599,10 +7152,15 @@ namespace NW.App
         }
 
         // ---- ENGINEER — Industrial hacker ----------------------------------------
-        static void P3DBuildEngineer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["engineer"] below. Unlike the
+        // hover-hacker units elsewhere (Cyber Hacker, Synth Keytar, Biopunk Mycelium),
+        // Engineer has real walking legs, so it gets the rig too.
+        static void P3DBuildEngineer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int cc) => SideJoints[q, cc];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -5612,6 +7170,7 @@ namespace NW.App
             Vector2 head = V(q == 5 ? 60 : 65, 101);
             bool arc = Atk(q);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 4.6f*s, cf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 5.8f*s, cf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 5.0f*s, cf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
@@ -5620,24 +7179,28 @@ namespace NW.App
             foreach (var f in new[]{ fF, nF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+8f*s,f.y+3f*s),
                                       new Vector2(f.x+6f*s,f.y-5f*s), new Vector2(f.x-6f*s,f.y-5f*s) },
-                         ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f);
-            P3DPlate(px,R, new[]{ V(44,84), V(58,86), V(60,58), V(46,56) }, cd, cf, 2.1f);
+                         ArtLeather, new Color(ArtLeather.r*0.45f,ArtLeather.g*0.45f,ArtLeather.b*0.45f), 1.6f*s);
+            }
+            P3DPlate(px,R, new[]{ V(44,84), V(58,86), V(60,58), V(46,56) }, cd, cf, 2.1f*s);
             IndRivets(px,R, 47,82, 57,84, 3, ch, s);
             for (int w = 0; w < 4; w++)
                 DrawLineR(px,R, 46f*s, (62f+w*4f)*s, 58f*s, (63f+w*4f)*s, 1.6f*s, ArtGold);
             IndGauge(px,R, 52, 76, 4.6f, arc ? 0.9f : 0.35f, s);
             P3DPlate(px,R, new[]{ V(54,84), V(74,84), V(76,62), V(70,48), V(58,48), V(52,62) },
-                     ArtCloth, ArtClothDk, 2.2f);
+                     ArtCloth, ArtClothDk, 2.2f*s);
             DrawLineR(px,R, 56f*s,72f*s, 74f*s,74f*s, 2.2f*s, ArtLeather);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.0f*s, ArtCloth, 0.1f,0.2f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.4f*s, ArtCloth, 0.1f,0.2f, L,H,fillL);
+            }
             P3DPlate(px,R, new[]{ new Vector2(head.x-10f*s,head.y-9f*s), new Vector2(head.x+10f*s,head.y-8f*s),
                                   new Vector2(head.x+9f*s,head.y+8f*s), new Vector2(head.x-9f*s,head.y+7f*s) },
-                     ArtCloth, ArtClothDk, 2.1f);
+                     ArtCloth, ArtClothDk, 2.1f*s);
             FillCircleR(px,R, head.x+4f*s, head.y-1f*s, 3.4f*s, new Color(0.12f,0.14f,0.10f));
             DrawRingR  (px,R, head.x+4f*s, head.y-1f*s, 4.4f*s, 1.3f*s, ArtGold);
             P3DEllipseGlow(px,R, head.x+4f*s, head.y-1f*s, 5f*s, 4f*s,
                 new Color(0.5f,0.8f,1f, arc ? 0.6f : 0.25f));
+            if (!rigged) {
             float lift = arc ? -18f : -4f;
             Vector2 d = RotP(new Vector2(0f,1f), Vector2.zero, lift);
             Vector2 top = new Vector2(nH.x/s + d.x*40f, nH.y/s + d.y*40f);
@@ -5665,6 +7228,7 @@ namespace NW.App
                     pxp = nx; pyp = ny;
                 }
                 P3DEllipseGlow(px,R, pxp*s, pyp*s, 10f*s, 9f*s, new Color(0.5f,0.8f,1f,0.6f));
+            }
             }
         }
 
@@ -5761,13 +7325,16 @@ namespace NW.App
                 c.a = 0.94f;
                 P3DSet(px, R, x, y, c);
             }
-            // veins radiating from the nucleus
+            // veins radiating from the nucleus. cx/cy/rx/ry all arrive pre-scaled by the
+            // caller; the vein stroke width is this function's own constant and needs the
+            // same R/128 scale so it doesn't thin out relative to the sac once R doubles.
+            float vs = R / 128f;
             for (int i = 0; i < 5; i++)
             {
                 float a = (i * 72f + 18f) * Mathf.Deg2Rad;
                 DrawLineR(px, R, cx + Mathf.Cos(a) * rx * 0.22f, cy + Mathf.Sin(a) * ry * 0.22f,
                                  cx + Mathf.Cos(a) * rx * 0.86f, cy + Mathf.Sin(a) * ry * 0.86f,
-                          1.2f, new Color(0.16f, 0.30f, 0.14f, 0.85f));
+                          1.2f * vs, new Color(0.16f, 0.30f, 0.14f, 0.85f));
             }
             FillCircleR(px, R, cx, cy, Mathf.Min(rx, ry) * 0.30f,
                 new Color(inner.r, inner.g, inner.b, 0.9f));
@@ -5785,16 +7352,23 @@ namespace NW.App
         /// </summary>
         static Vector2[] P3DChitin(Color[] px, int R, Vector2[] pts, P3DP p, int seed, float ow)
         {
+            // pts arrive pre-scaled by the caller's own s (they're built with V(), which
+            // multiplies by s). The jitter amplitude and the two stroke widths below are this
+            // function's own constants, not caller-supplied, so they need their own R/128
+            // scale -- unscaled, they'd render correctly at the R=128 this theme was authored
+            // at but shrink to half their intended relative size the moment Biopunk moves to
+            // R=256 alongside Cyber/Synthwave.
+            float s = R / 128f;
             var j = new Vector2[pts.Length];
             for (int i = 0; i < pts.Length; i++)
             {
                 float a = Mathf.Sin((seed + i) * 12.9898f) * 43758.5453f;
                 float b = Mathf.Sin((seed + i) * 78.2330f) * 43758.5453f;
-                j[i] = new Vector2(pts[i].x + ((a - Mathf.Floor(a)) - 0.5f) * 2.6f,
-                                   pts[i].y + ((b - Mathf.Floor(b)) - 0.5f) * 2.6f);
+                j[i] = new Vector2(pts[i].x + ((a - Mathf.Floor(a)) - 0.5f) * 2.6f * s,
+                                   pts[i].y + ((b - Mathf.Floor(b)) - 0.5f) * 2.6f * s);
             }
-            P3DPlate(px, R, j, ArtSteelHi(p), ArtSteelBase(p), ow);
-            DrawLineR(px, R, j[0].x, j[0].y, j[1].x, j[1].y, 1.4f, new Color(1f, 1f, 1f, 0.28f));
+            P3DPlate(px, R, j, ArtSteelHi(p), ArtSteelBase(p), ow * s);
+            DrawLineR(px, R, j[0].x, j[0].y, j[1].x, j[1].y, 1.4f * s, new Color(1f, 1f, 1f, 0.28f));
             return j;
         }
 
@@ -5830,7 +7404,7 @@ namespace NW.App
                     new Vector2((x + dir * w) * s, (yy + h * 0.5f) * s),
                     new Vector2((x + dir * w * 0.92f) * s, (yy + h * 1.5f) * s),
                     new Vector2(x * s, (yy + h * 1.3f) * s) },
-                    ArtSteelHi(p), ArtSteelBase(p), 1.7f);
+                    ArtSteelHi(p), ArtSteelBase(p), 1.7f * s);
                 DrawLineR(px, R, (x + dir * 3f * sc) * s, (yy + h * 0.6f) * s,
                                  (x + dir * w * 0.86f) * s, (yy + h * 1.0f) * s, 1.1f * sc * s, ArtGoldDk);
             }
@@ -5861,7 +7435,7 @@ namespace NW.App
                 new Vector2((x - 18f * sc) * s, y * s), new Vector2((x - 13f * sc) * s, (y + 11f * sc) * s),
                 new Vector2(x * s, (y + 15f * sc) * s), new Vector2((x + 13f * sc) * s, (y + 11f * sc) * s),
                 new Vector2((x + 18f * sc) * s, y * s) },
-                ArtSteelHi(p), ArtSteelBase(p), 2.2f);
+                ArtSteelHi(p), ArtSteelBase(p), 2.2f * s);
             for (int i = 0; i < 7; i++)
             {
                 float gx = x - 15f * sc + i * 5f * sc;
@@ -5890,15 +7464,20 @@ namespace NW.App
                     new Vector2(tip.x + sd.x * 12f * s, tip.y + sd.y * 12f * s),
                     new Vector2(tip.x + sd.x * 5f * s - sd.y * 3f * s,
                                 tip.y + sd.y * 5f * s + sd.x * 3f * s) },
-                    ArtGoldHi, ArtGold, 1.1f);
+                    ArtGoldHi, ArtGold, 1.1f * s);
             }
         }
 
         // ---- MUTANT — Biopunk trooper ------------------------------------------
-        static void P3DBuildMutant(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["mutant"] below. Same split as
+        // Cyber's Lancer: attack poses stay on the untouched baked draw below, idle/walk go
+        // through the live rig.
+        static void P3DBuildMutant(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -5908,6 +7487,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11)), fE = V(J(12),J(13)), fH = V(J(14),J(15));
             Vector2 head = V(q == 5 ? 60 : 67, 101);
 
+            if (!rigged) {
             // withered far arm — thin and short
             P3DLimb(px,R, shF.x,shF.y, fE.x+3f*s,fE.y+2f*s, 2.6f*s, cf, 0.1f,0.3f, L,H,fillL);
             P3DLimb(px,R, fE.x+3f*s,fE.y+2f*s, fH.x+6f*s,fH.y+4f*s, 2.0f*s, cf, 0.1f,0.3f, L,H,fillL);
@@ -5921,21 +7501,23 @@ namespace NW.App
             P3DLimb(px,R, nF.x-3f*s,nF.y+7f*s, nF.x+5f*s,nF.y, 4.2f*s, cd, 0.15f,0.35f, L,H,fillL);
             P3DPlate(px,R, new[]{ new Vector2(nF.x-3f*s,nF.y+2f*s), new Vector2(nF.x+10f*s,nF.y+2f*s),
                                   new Vector2(nF.x+8f*s,nF.y-3f*s), new Vector2(nF.x-3f*s,nF.y-3f*s) },
-                     ArtGold, ArtGoldDk, 1.4f);
+                     ArtGold, ArtGoldDk, 1.4f*s);
+            }
 
             P3DPlate(px,R, new[]{ V(54,86), V(73,88), V(76,68), V(68,52), V(57,52), V(51,68) },
-                     ArtCloth, ArtClothDk, 2.2f);
+                     ArtCloth, ArtClothDk, 2.2f*s);
             P3DChitin(px,R, new[]{ V(62,88), V(78,86), V(80,70), V(64,68) }, p, 3, 2.1f);
             P3DChitin(px,R, new[]{ V(60,68), V(76,70), V(74,56), V(60,55) }, p, 9, 1.9f);
             P3DSac(px,R, head.x-2f*s, head.y-9f*s, 8f*s, 6f*s, ArtRune, Atk(q) ? 1f : 0f);
             P3DPlate(px,R, new[]{ new Vector2(head.x-10f*s,head.y-5f*s), new Vector2(head.x+11f*s,head.y-3f*s),
                                   new Vector2(head.x+9f*s,head.y+8f*s), new Vector2(head.x-8f*s,head.y+7f*s) },
-                     ch, c, 2.1f);
+                     ch, c, 2.1f*s);
             DrawLineR(px,R, head.x-6f*s, head.y+2f*s, head.x+8f*s, head.y+3f*s, 1.6f*s, ArtGoldDk);
             for (int t = 0; t < 3; t++)
                 FillCircleR(px,R, head.x+(2f+t*3f)*s, head.y+5f*s, 1.4f*s,
                     new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.85f));
 
+            if (!rigged) {
             // overgrown near arm — the read
             float sw = q == 4 ? 42f : (q == 3 ? -40f : -8f);
             P3DLimb(px,R, shN.x-1f*s,shN.y, nE.x+2f*s,nE.y-4f*s, 8.5f*s, c, 0.2f,0.4f, L,H,fillL);
@@ -5946,14 +7528,20 @@ namespace NW.App
             BioBone(px,R, new Vector2(nH.x+4f*s, nH.y-6f*s), sw, 22f, s);
             if (q == 4) P3DEllipseGlow(px,R, nH.x+26f*s, nH.y-2f*s, 15f*s, 13f*s,
                 new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.4f));
+            }
         }
 
         // ---- STINGER — Biopunk sniper -------------------------------------------
+        // part 3 = torso/head only, no legs -- see _multiLegRigs["stinger"] below. Same split
+        // as the 2-leg humanoid rig, extended to a 4-leg insect: front pair and back pair are
+        // two independently-rotating rig segments (each segment still draws its own near+far
+        // depth copy together, since those two copies always shared one phase anyway).
         static void P3DBuildStinger(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -5961,18 +7549,24 @@ namespace NW.App
             Vector2 head = V(q == 5 ? 62 : 69, 86);
             float pump = q == 3 ? 1.4f : (q == 4 ? 0.4f : 1f);
 
-            BioSegLeg(px,R, 58f,52f, new[]{ new Vector2(46,40), new Vector2(40,20) }, 3.4f, cf, s, L,H,fillL);
-            BioSegLeg(px,R, 60f,52f, new[]{ new Vector2(52,36), new Vector2(48,19) }, 3.8f, cf, s, L,H,fillL);
-            BioSegLeg(px,R, 66f,52f, new[]{ new Vector2(76,38), new Vector2(82,20) }, 4.0f, cd, s, L,H,fillL);
-            BioSegLeg(px,R, 68f,52f, new[]{ new Vector2(80,44), new Vector2(88,22) }, 3.6f, cd, s, L,H,fillL);
+            if (!rigged) {
+            // Legs never referenced q at all before -- a sniper that marches the lane on
+            // perfectly static, splayed legs reads as sliding rather than walking. Left/right
+            // leg pairs sweep opposite directions, four-beat (q1/q2/q6/q7) like Crawler/Hive.
+            float st = q == 1 ? 2.4f : (q == 2 ? 0.8f : (q == 6 ? -0.8f : (q == 7 ? -2.4f : 0f)));
+            BioSegLeg(px,R, 58f,52f, new[]{ new Vector2(46f-st,40f), new Vector2(40f-st*1.3f,20f) }, 3.4f, cf, s, L,H,fillL);
+            BioSegLeg(px,R, 60f,52f, new[]{ new Vector2(52f-st,36f), new Vector2(48f-st*1.3f,19f) }, 3.8f, cf, s, L,H,fillL);
+            BioSegLeg(px,R, 66f,52f, new[]{ new Vector2(76f+st,38f), new Vector2(82f+st*1.3f,20f) }, 4.0f, cd, s, L,H,fillL);
+            BioSegLeg(px,R, 68f,52f, new[]{ new Vector2(80f+st,44f), new Vector2(88f+st*1.3f,22f) }, 3.6f, cd, s, L,H,fillL);
+            }
 
             P3DSac(px,R, 52f*s, 56f*s, 15f*pump*s, 12f*pump*s, ArtRune, Atk(q) ? 1f : 0f);
             P3DChitin(px,R, new[]{ V(44,62), V(62,64), V(64,50), V(46,48) }, p, 2, 1.9f);
-            P3DPlate(px,R, new[]{ V(58,72), V(76,74), V(80,58), V(62,54) }, ch, c, 2.2f);
+            P3DPlate(px,R, new[]{ V(58,72), V(76,74), V(80,58), V(62,54) }, ch, c, 2.2f*s);
             DrawLineR(px,R, 62f*s, 66f*s, 78f*s, 68f*s, 1.5f*s, ArtGoldDk);
             P3DPlate(px,R, new[]{ new Vector2(head.x-9f*s,head.y-7f*s), new Vector2(head.x+9f*s,head.y-5f*s),
                                   new Vector2(head.x+8f*s,head.y+6f*s), new Vector2(head.x-8f*s,head.y+5f*s) },
-                     c, cd, 2f);
+                     c, cd, 2f*s);
             for (int e = 0; e < 3; e++)
             for (int f = 0; f < 2; f++)
                 FillCircleR(px,R, head.x+(-4f+e*4.4f)*s, head.y+(-2f+f*4f)*s, 1.8f*s,
@@ -5995,10 +7589,15 @@ namespace NW.App
         }
 
         // ---- CARAPACE — Biopunk shield-bot --------------------------------------
-        static void P3DBuildCarapace(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["carapace"] below. Shield/fungus
+        // shelf stays on the body layer, same as Cyber Bastion's shield: it's body-mounted,
+        // not hand-held, so it belongs outside the rig either way.
+        static void P3DBuildCarapace(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
@@ -6008,6 +7607,7 @@ namespace NW.App
             Vector2 nH = V(J(10),J(11));
             Vector2 head = V(q == 5 ? 55 : 60, 88);
 
+            if (!rigged) {
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 7.4f*s, cf, 0.1f,0.3f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 6.4f*s, cf, 0.1f,0.3f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, nK.x,nK.y, 8.6f*s, cd, 0.15f,0.35f, L,H,fillL);
@@ -6017,46 +7617,68 @@ namespace NW.App
                 Vector2 f = i == 0 ? nF : fF;
                 P3DPlate(px,R, new[]{ new Vector2(f.x-8f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
                                       new Vector2(f.x+7f*s,f.y-4f*s), new Vector2(f.x-7f*s,f.y-4f*s) },
-                         i == 0 ? ArtGold : ArtGoldDk, ArtGoldDk, 1.6f);
+                         i == 0 ? ArtGold : ArtGoldDk, ArtGoldDk, 1.6f*s);
+            }
             }
             P3DPlate(px,R, new[]{ V(48,80), V(70,82), V(72,60), V(64,48), V(52,48), V(45,60) },
-                     ArtCloth, ArtClothDk, 2.3f);
+                     ArtCloth, ArtClothDk, 2.3f*s);
             P3DChitin(px,R, new[]{ V(47,80), V(69,82), V(70,64), V(48,62) }, p, 7, 2.2f);
             P3DPlate(px,R, new[]{ new Vector2(head.x-8f*s,head.y-6f*s), new Vector2(head.x+9f*s,head.y-4f*s),
                                   new Vector2(head.x+7f*s,head.y+5f*s), new Vector2(head.x-7f*s,head.y+4f*s) },
-                     ch, c, 2f);
+                     ch, c, 2f*s);
             for (int e = 0; e < 2; e++)
                 FillCircleR(px,R, head.x+(2f+e*4f)*s, head.y, 1.6f*s,
                     new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.85f));
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nH.x-2f*s,nH.y-2f*s, 5.0f*s, c, 0.2f,0.4f, L,H,fillL);
             float sp = q == 4 ? 16f : (q == 3 ? -8f : 2f);
             BioBone(px,R, new Vector2(nH.x-2f*s, nH.y-2f*s), sp + 40f, 13f, s);
+            }
             BioShelf(px,R, 64f + (q == 4 ? 12f : (q == 3 ? 2f : 7f)), 50f, p, 1.0f, 1f, s);
         }
 
         // ---- CRAWLER — Biopunk mech ---------------------------------------------
+        // part 3 = torso/head only, no legs -- see _multiLegRigs["crawler"] below. Three rig
+        // segments (front/mid/back), each still drawing its own near+far depth pair together --
+        // those two copies always shared one phase (the ripple offset is by ROW INDEX i, not by
+        // near/far), so splitting near from far would buy nothing and lose the tripod ripple.
         static void P3DBuildCrawler(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, not Pose6: rows 6/7 are the mirrored contact/pass beats (far foot leads,
+            // see SideJoints' own comment) -- folding them back onto 1/2 is exactly the "two
+            // frames swapping" toggle that made the humanoid walk read wrong before it got a
+            // four-beat cycle. Crawler gets the same fix, on its own leg formula instead of
+            // the shared joint table.
+            int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
-            float t   = q == 1 ? 1f : (q == 2 ? -1f : 0f);
+            // Four-beat instead of two: legs sweep through mid-stride positions (q6/q7) instead
+            // of snapping directly between the two extremes (q1/q2). Amplitude trimmed ~20%
+            // from a first pass that swung too wide between frames -- a finer, less stompy step.
+            float t   = q == 1 ? 0.8f : (q == 2 ? 0.27f : (q == 6 ? -0.27f : (q == 7 ? -0.8f : 0f)));
             float rec = q == 4 ? -6f : (q == 3 ? 3f : 0f);
 
             P3DEllipseGlow(px,R, 64f*s, 15f*s, 34f*s, 7f*s, new Color(0f,0f,0f,0.45f));
+            if (!rigged) {
             for (int i = 0; i < 3; i++)
             {
+                // Ripple across the row instead of all three legs snapping in lockstep -- the
+                // front leg leads, the back leg lags, same idea as a real hexapod's tripod gait.
+                float ti = Mathf.Clamp(t + (i - 1) * 0.22f, -1f, 1f);
                 float bx = 48f + i * 13f;
-                BioSegLeg(px,R, bx,44f, new[]{ new Vector2(bx-11f+t*5f,30f), new Vector2(bx-16f+t*7f,18f) },
+                BioSegLeg(px,R, bx,44f, new[]{ new Vector2(bx-11f+ti*5f,30f), new Vector2(bx-16f+ti*7f,18f) },
                           3.2f, cf, s, L,H,fillL);
             }
             for (int j = 0; j < 3; j++)
             {
+                float tj = Mathf.Clamp(t + (j - 1) * 0.22f, -1f, 1f);
                 float bx = 54f + j * 13f;
-                BioSegLeg(px,R, bx,42f, new[]{ new Vector2(bx+12f-t*5f,30f), new Vector2(bx+17f-t*7f,18f) },
+                BioSegLeg(px,R, bx,42f, new[]{ new Vector2(bx+12f-tj*5f,30f), new Vector2(bx+17f-tj*7f,18f) },
                           3.8f, cd, s, L,H,fillL);
+            }
             }
             P3DChitin(px,R, new[]{ V(42,44), V(86,46), V(90,64), V(80,74), V(48,72), V(38,60) }, p, 11, 2.6f);
             P3DChitin(px,R, new[]{ V(48,70), V(80,72), V(78,58), V(50,56) }, p, 13, 2.0f);
@@ -6066,7 +7688,7 @@ namespace NW.App
             float sx = 76f + rec;
             P3DSac(px,R, (sx-6f)*s, 78f*s, 13f*s, 10f*s, ArtRune, q == 3 ? 1f : 0f);
             P3DLimb(px,R, (sx+2f)*s,78f*s, (sx+18f)*s,76f*s, 4.6f*s, c, 0.2f,0.4f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(sx+16,82), V(sx+28,79), V(sx+16,72) }, ch, c, 1.8f);
+            P3DPlate(px,R, new[]{ V(sx+16,82), V(sx+28,79), V(sx+16,72) }, ch, c, 1.8f*s);
             DrawRingR(px,R, (sx+22f)*s, 77.5f*s, 3.2f*s, 1.4f*s, ArtGoldDk);
             if (q == 4)
                 for (int e = 0; e < 4; e++)
@@ -6078,21 +7700,29 @@ namespace NW.App
         }
 
         // ---- HIVE — Biopunk titan ------------------------------------------------
+        // part 3 = torso/head only, no legs -- see _legHips["hive"] above. Four independent
+        // rig segments, one per leg: the old sweep already moved diagonal pairs together (a
+        // real trot), which a 2-segment front/back rig can't reproduce.
         static void P3DBuildHive(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, not Pose6 -- same four-beat fix as Crawler, own leg formula below.
+            int q = Pose8(pose);
+            bool rigged = part == 3;
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color c = ArtSteelBase(p), ch = ArtSteelHi(p), cd = ArtSteelDk(p), cf = ArtSteelFar(p);
-            float st   = q == 1 ? 4f : (q == 2 ? -4f : 0f);
+            // Amplitude trimmed ~20%, same reasoning as Crawler -- finer, less stompy.
+            float st   = q == 1 ? 3.2f : (q == 2 ? 1.0f : (q == 6 ? -1.0f : (q == 7 ? -3.2f : 0f)));
             float lean = q == 3 ? -8f : (q == 4 ? 8f : 0f);
 
             P3DEllipseGlow(px,R, 64f*s, 16f*s, 38f*s, 9f*s, new Color(0f,0f,0f,0.5f));
+            if (!rigged) {
             BioSegLeg(px,R, 52f,52f, new[]{ new Vector2(40-st,34), new Vector2(34-st,18) }, 6.0f, cf, s, L,H,fillL);
             BioSegLeg(px,R, 58f,50f, new[]{ new Vector2(46+st,32), new Vector2(42+st,18) }, 6.6f, cf, s, L,H,fillL);
             BioSegLeg(px,R, 70f,50f, new[]{ new Vector2(82-st,32), new Vector2(88-st,18) }, 7.0f, cd, s, L,H,fillL);
             BioSegLeg(px,R, 76f,52f, new[]{ new Vector2(88+st,34), new Vector2(94+st,18) }, 6.4f, cd, s, L,H,fillL);
+            }
 
             // the brood chamber — larvae visible inside the membrane
             P3DSac(px,R, (56f+lean*0.4f)*s, 62f*s, 26f*s, 22f*s, ArtRune, Atk(q) ? 1f : 0f);
@@ -6105,14 +7735,14 @@ namespace NW.App
             for (int b = 0; b < 3; b++)
                 P3DChitin(px,R, new[]{ V(38+b*2,74+b*4), V(76-b*2,76+b*4),
                                        V(74-b*2,66+b*4), V(40+b*2,64+b*4) }, p, 20+b, 1.9f);
-            P3DPlate(px,R, new[]{ V(72+lean,86), V(92+lean,84), V(94+lean,66), V(74+lean,64) }, ch, c, 2.4f);
+            P3DPlate(px,R, new[]{ V(72+lean,86), V(92+lean,84), V(94+lean,66), V(74+lean,64) }, ch, c, 2.4f*s);
             float open = q == 3 ? -14f : (q == 4 ? 18f : 0f);
             P3DLimb(px,R, (88f+lean)*s,80f*s, (102f+lean+open*0.4f)*s,(74f+open*0.3f)*s, 6.0f*s, c, 0.2f,0.4f, L,H,fillL);
             P3DLimb(px,R, (88f+lean)*s,72f*s, (100f+lean+open*0.4f)*s,(62f-open*0.3f)*s, 5.4f*s, cd, 0.2f,0.4f, L,H,fillL);
             P3DPlate(px,R, new[]{ V(100+lean+open*0.4f,77+open*0.3f), V(116+lean+open,72+open*0.5f),
-                                  V(100+lean+open*0.4f,69+open*0.3f) }, ArtGoldHi, ArtGold, 1.6f);
+                                  V(100+lean+open*0.4f,69+open*0.3f) }, ArtGoldHi, ArtGold, 1.6f*s);
             P3DPlate(px,R, new[]{ V(98+lean+open*0.4f,65-open*0.3f), V(113+lean+open,58-open*0.5f),
-                                  V(98+lean+open*0.4f,58-open*0.3f) }, ArtGoldHi, ArtGold, 1.6f);
+                                  V(98+lean+open*0.4f,58-open*0.3f) }, ArtGoldHi, ArtGold, 1.6f*s);
             FillCircleR(px,R, (92f+lean)*s, 90f*s, 7.4f*s, ch);
             for (int e = 0; e < 4; e++)
                 FillCircleR(px,R, (90f+lean+(e%2)*4f)*s, (92f-(e/2)*4f)*s, 1.8f*s,
@@ -6138,7 +7768,7 @@ namespace NW.App
                 float pvx = -Mathf.Sin(d)*len*0.26f, pvy = Mathf.Cos(d)*len*0.26f;
                 P3DPlate(px,R, new[]{ V(ax,ay), V(tx+pvx*0.5f, ty+pvy*0.5f), V(tx-pvx*0.4f, ty-pvy*0.4f) },
                          new Color(tone.r, tone.g, tone.b, al),
-                         new Color(ArtRune.r, ArtRune.g, ArtRune.b, al*0.45f), 1.3f);
+                         new Color(ArtRune.r, ArtRune.g, ArtRune.b, al*0.45f), 1.3f*s);
                 for (int v = 1; v < 4; v++)
                     DrawLineR(px,R, ax*s, ay*s,
                               (ax+(tx-ax)+pvx*(v/4f-0.4f))*s, (ay+(ty-ay)+pvy*(v/4f-0.4f))*s,
@@ -6151,8 +7781,8 @@ namespace NW.App
 
             P3DSac(px,R, 48f*s, 54f*s, 11f*s, 8f*s, ArtRune, Atk(q) ? 1f : 0f);
             for (int i = 0; i < 3; i++)
-                P3DPlate(px,R, new[]{ V(54+i*7,62), V(62+i*7,63), V(63+i*7,52), V(55+i*7,51) }, ch, c, 1.6f);
-            P3DPlate(px,R, new[]{ V(72,64), V(84,66), V(86,56), V(74,54) }, ch, c, 2f);
+                P3DPlate(px,R, new[]{ V(54+i*7,62), V(62+i*7,63), V(63+i*7,52), V(55+i*7,51) }, ch, c, 1.6f*s);
+            P3DPlate(px,R, new[]{ V(72,64), V(84,66), V(86,56), V(74,54) }, ch, c, 2f*s);
             FillCircleR(px,R, 88f*s, 62f*s, 5.4f*s, c);
             for (int e = 0; e < 2; e++)
                 FillCircleR(px,R, 90f*s, (63f-e*3f)*s, 1.8f*s,
@@ -6160,7 +7790,7 @@ namespace NW.App
             float curl = q == 4 ? -26f : (Atk(q) ? 10f : 0f);
             P3DLimb(px,R, 44f*s,50f*s, 34f*s,(44f+curl*0.4f)*s, 2.8f*s, ArtGold, 0.2f,0.4f, L,H,fillL);
             P3DLimb(px,R, 34f*s,(44f+curl*0.4f)*s, 28f*s,(36f+curl)*s, 2.0f*s, ArtGoldHi, 0.2f,0.4f, L,H,fillL);
-            P3DPlate(px,R, new[]{ V(28,39+curl), V(21,32+curl), V(30,34+curl) }, ArtGoldHi, ArtGold, 1.1f);
+            P3DPlate(px,R, new[]{ V(28,39+curl), V(21,32+curl), V(30,34+curl) }, ArtGoldHi, ArtGold, 1.1f*s);
             if (q == 4) P3DEllipseGlow(px,R, 22f*s, (34f+curl)*s, 8f*s, 8f*s,
                 new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.6f));
         }
@@ -6192,7 +7822,7 @@ namespace NW.App
                           (2.6f - Mathf.Abs(i-2)*0.4f)*s, i % 2 == 0 ? c : cd);
             }
             P3DPlate(px,R, new[]{ V(56+sway,88), V(72+sway,88), V(70+sway,60), V(58+sway,60) },
-                     ArtCloth, ArtClothDk, 2.1f);
+                     ArtCloth, ArtClothDk, 2.1f*s);
             P3DSac(px,R, (54f+sway)*s, 70f*s, 7f*s, 6f*s, ArtRune, Atk(q) ? 1f : 0f);
             P3DSac(px,R, (74f+sway)*s, 78f*s, 6f*s, 5f*s, ArtRune, Atk(q) ? 1f : 0f);
             BioCap(px,R, 64f+sway, 92f, p, 1.0f, s);
@@ -6227,12 +7857,12 @@ namespace NW.App
 
             P3DSac(px,R, 64f*s, (74f+dv)*s, 17f*s, 15f*s, ArtRune, puff);
             P3DPlate(px,R, new[]{ V(50,80+dv), V(64,90+dv), V(78,80+dv), V(74,74+dv), V(54,74+dv) },
-                     ArtSteelHi(p), c, 2.0f);
+                     ArtSteelHi(p), c, 2.0f*s);
             for (int i = 0; i < 4; i++)
                 DrawLineR(px,R, (56f+i*5f)*s, (80f+dv)*s, (58f+i*5f)*s, (88f+dv)*s, 1.3f*s, ArtGoldDk);
             float gw = 15f + puff * 3f;
             P3DPlate(px,R, new[]{ V(64-gw,62+dv), V(64+gw,62+dv), V(64+gw*0.6f,54+dv), V(64-gw*0.6f,54+dv) },
-                     ArtCloth, ArtClothDk, 1.8f);
+                     ArtCloth, ArtClothDk, 1.8f*s);
             for (int g = 0; g < 6; g++)
                 DrawLineR(px,R, (64f-11f+g*4.4f)*s, (62f+dv)*s, (64f-8f+g*3.2f)*s, (55f+dv)*s, 1.2f*s, ArtGoldDk);
             BioFilaments(px,R, 64f, 52f+dv, 5, 16f, 3f, ArtClothDk, s);
@@ -6269,20 +7899,20 @@ namespace NW.App
                 DrawLineR(px,R, 64f*s, 26f*s, ex*s, ey*s, (3.4f - Mathf.Abs(i-3)*0.4f)*s, cd);
                 DrawLineR(px,R, ex*s, ey*s, (ex+(ex-64f)*0.3f)*s, (ey-3f)*s, 1.8f*s, ArtGoldDk);
             }
-            P3DPlate(px,R, new[]{ V(50,20), V(78,20), V(74,32), V(54,32) }, ch, c, 2.2f);
+            P3DPlate(px,R, new[]{ V(50,20), V(78,20), V(74,32), V(54,32) }, ch, c, 2.2f*s);
             P3DLimb(px,R, 64f*s,30f*s, 66f*s,58f*s, 6.4f*s, c, 0.15f,0.35f, L,H,fillL);
             for (int f = 0; f < 3; f++)
                 DrawLineR(px,R, (61f+f*3f)*s, 32f*s, (63f+f*3f)*s, 56f*s, 1.2f*s, ArtGoldDk);
 
             float split = q == 4 ? 9f : (q == 3 ? -2f : 0f);
             P3DSac(px,R, 66f*s, 72f*s, 15f*swell*s, 17f*swell*s, ArtRune, q == 3 ? 1f : 0f);
-            P3DPlate(px,R, new[]{ V(52,72), V(50-split,86), V(62,90), V(64,74) }, ch, c, 2.0f);
-            P3DPlate(px,R, new[]{ V(80,72), V(82+split,86), V(70,90), V(68,74) }, ch, c, 2.0f);
+            P3DPlate(px,R, new[]{ V(52,72), V(50-split,86), V(62,90), V(64,74) }, ch, c, 2.0f*s);
+            P3DPlate(px,R, new[]{ V(80,72), V(82+split,86), V(70,90), V(68,74) }, ch, c, 2.0f*s);
             if (q == 4)
                 for (int e = 0; e < 3; e++)
                 {
                     P3DPlate(px,R, new[]{ V(84+e*13,74+e*2), V(96+e*13,71+e*2), V(84+e*13,68+e*2) },
-                             ArtGoldHi, ArtGold, 1.2f);
+                             ArtGoldHi, ArtGold, 1.2f*s);
                     P3DEllipseGlow(px,R, (90f+e*13f)*s, (71f+e*2f)*s, (7f-e*1.6f)*s, (6f-e*1.4f)*s,
                         new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.6f - e*0.15f));
                 }
@@ -6734,13 +8364,15 @@ namespace NW.App
         static void P3DBuildEmber(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: dv is a symmetric hover bob (Cruiser's pattern); spin is a monotonic
+            // sweep (Crawler's pattern) since the ring has to keep turning one way.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
             Color b = ArtSteelBase(p), bh = ArtSteelHi(p), bd = ArtSteelDk(p);
 
             float tilt = q == 4 ? -34f : (q == 3 ? 12f : (q == 1 ? 6f : (q == 2 ? -6f : 0f)));
-            float dv   = q == 4 ? -5f  : (q == 1 ? 2f  : (q == 2 ? -2f : 0f));
-            float spin = q == 1 ? 18f  : (q == 2 ? -18f : (Atk(q) ? 30f : 0f));
+            float dv   = q == 4 ? -5f  : (q == 1 ? 2f  : (q == 2 || q == 7 ? 0f : (q == 6 ? -2f : 0f)));
+            float spin = q == 1 ? 18f  : (q == 2 ? 6f : (q == 6 ? -6f : (q == 7 ? -18f : (Atk(q) ? 30f : 0f))));
 
             DrawLineR(px,R, 64f*s, (46f+dv)*s, 64f*s, (96f+dv)*s, 4.2f*s, bd);
             DrawLineR(px,R, 64f*s, (46f+dv)*s, 64f*s, (96f+dv)*s, 1.8f*s, bh);
@@ -6805,10 +8437,13 @@ namespace NW.App
         }
 
         // ---- GUARDIAN — Solar trooper ------------------------------------------
-        static void P3DBuildGuardian(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["guardian"] below.
+        static void P3DBuildGuardian(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -6820,6 +8455,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11)), fE = V(J(12),J(13)), fH = V(J(14),J(15));
             Vector2 head = V(q == 5 ? 60 : 66, 104);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, fE.x,fE.y, 4.8f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fE.x,fE.y, fH.x,fH.y, 4.2f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 6.6f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -6831,7 +8467,7 @@ namespace NW.App
                 var gr = new[]{ V(-6,4), V(6,4), V(5,-15), V(-5,-15) };
                 for (int i = 0; i < gr.Length; i++)
                     gr[i] = RotP(new Vector2(nK.x+gr[i].x, nK.y+gr[i].y), nK, gA);
-                P3DPlate(px,R, gr, bh, b, 1.8f);
+                P3DPlate(px,R, gr, bh, b, 1.8f*s);
                 DrawLineR(px,R, gr[0].x, gr[0].y, gr[3].x, gr[3].y, 1.4f*s,
                           new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.7f));
             }
@@ -6843,12 +8479,14 @@ namespace NW.App
                                     : ArtLeather;
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+9f*s,f.y+3f*s),
                                       new Vector2(f.x+7f*s,f.y-3f*s), new Vector2(f.x-6f*s,f.y-3f*s) },
-                         sole, new Color(ArtLeather.r*0.4f, ArtLeather.g*0.4f, ArtLeather.b*0.4f), 1.6f);
+                         sole, new Color(ArtLeather.r*0.4f, ArtLeather.g*0.4f, ArtLeather.b*0.4f), 1.6f*s);
                 DrawLineR(px,R, f.x-4f*s, f.y+4f*s, f.x+5f*s, f.y+7f*s, 1.3f*s, ArtGold);
+            }
             }
             SolPteruges(px, R, 63f, 56f, sway, s);
             SolLorica  (px, R, 63f, 72f, p, s);
 
+            if (!rigged) {
             void Shoulder(Vector2 sh, Vector2 elb, Color hi, Color lo, float sc)
             {
                 float a = Mathf.Atan2(elb.y-sh.y, elb.x-sh.x) * Mathf.Rad2Deg + 90f;
@@ -6856,7 +8494,7 @@ namespace NW.App
                                 new Vector2(8f*sc,-8f*sc),  new Vector2(-8f*sc,-8f*sc) };
                 for (int i = 0; i < pl.Length; i++)
                     pl[i] = RotP(new Vector2(sh.x+pl[i].x*s, sh.y+pl[i].y*s), sh, a);
-                P3DPlate(px,R, pl, hi, lo, 1.9f);
+                P3DPlate(px,R, pl, hi, lo, 1.9f*s);
                 Vector2 c = RotP(new Vector2(sh.x, sh.y-1.5f*s), sh, a);
                 FillCircleR(px,R, c.x, c.y, 3.0f*s, ArtGold);
                 DrawRingR  (px,R, c.x, c.y, 4.6f*s, 1.2f*s, ArtGoldHi);
@@ -6866,7 +8504,9 @@ namespace NW.App
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.2f*s, b, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.6f*s, b, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
             Shoulder(shN, nE, bh, b, 1.0f);
+            }
             SolCrown(px, R, head.x/s, head.y/s, p, s);
+            if (!rigged)
             SolGlaive(px, R, nH, q == 4 ? 52f : (q == 3 ? -58f : -14f), p, s);
         }
 
@@ -6923,10 +8563,14 @@ namespace NW.App
         }
 
         // ---- AEGIS — Solar shield-bot ------------------------------------------
-        static void P3DBuildAegis(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["aegis"] below. Sun disc shield is
+        // body-mounted, not hand-held, so it stays outside the rig either way.
+        static void P3DBuildAegis(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -6937,6 +8581,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11));
             Vector2 head = V(q == 5 ? 58 : 63, 98);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 5.4f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 8.0f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 7.0f*s, bf, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -6945,28 +8590,29 @@ namespace NW.App
             foreach (var f in new[]{ nF, fF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-9f*s,f.y+4f*s), new Vector2(f.x+10f*s,f.y+4f*s),
                                       new Vector2(f.x+8f*s,f.y-5f*s), new Vector2(f.x-8f*s,f.y-5f*s) },
-                         bd, bf, 1.8f);
+                         bd, bf, 1.8f*s);
+            }
             SolLorica(px, R, 62f, 70f, p, s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-11f*s,head.y-9f*s), new Vector2(head.x+11f*s,head.y-9f*s),
                                   new Vector2(head.x+10f*s,head.y+4f*s), new Vector2(head.x,head.y+9f*s),
-                                  new Vector2(head.x-10f*s,head.y+4f*s) }, bh, b, 2.2f);
+                                  new Vector2(head.x-10f*s,head.y+4f*s) }, bh, b, 2.2f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-8f*s,head.y-2f*s), new Vector2(head.x+9f*s,head.y-2f*s),
                                   new Vector2(head.x+9f*s,head.y+1f*s), new Vector2(head.x-8f*s,head.y+1f*s) },
-                     new Color(0.06f,0.04f,0.03f), new Color(0.02f,0.01f,0.01f), 1f);
+                     new Color(0.06f,0.04f,0.03f), new Color(0.02f,0.01f,0.01f), 1f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x-11f*s,head.y-9f*s), new Vector2(head.x-6f*s,head.y-9f*s),
                                   new Vector2(head.x-7f*s,head.y-17f*s), new Vector2(head.x-12f*s,head.y-16f*s) },
-                     b, bd, 1.4f);
+                     b, bd, 1.4f*s);
             P3DPlate(px,R, new[]{ new Vector2(head.x+7f*s,head.y-9f*s), new Vector2(head.x+12f*s,head.y-9f*s),
                                   new Vector2(head.x+11f*s,head.y-16f*s), new Vector2(head.x+6f*s,head.y-17f*s) },
-                     b, bd, 1.4f);
+                     b, bd, 1.4f*s);
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.8f*s, b, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 5.0f*s, b, p.metallic*.85f, p.smoothness*.9f, L,H,fillL);
-            {
-                float sw = q == 4 ? 16f : (q == 3 ? -9f : 3f);
-                DrawLineR(px,R, nH.x, nH.y, nH.x+sw*s, nH.y+16f*s, 3.0f*s, ArtLeather);
-                P3DPlate(px,R, new[]{ new Vector2(nH.x+(sw-3)*s, nH.y+16f*s), new Vector2(nH.x+(sw+3)*s, nH.y+16f*s),
-                                      new Vector2(nH.x+(sw+7)*s, nH.y+23f*s), new Vector2(nH.x+(sw+1)*s, nH.y+22f*s) },
-                         ArtGoldHi, ArtGold, 1.4f);
+            float sw = q == 4 ? 16f : (q == 3 ? -9f : 3f);
+            DrawLineR(px,R, nH.x, nH.y, nH.x+sw*s, nH.y+16f*s, 3.0f*s, ArtLeather);
+            P3DPlate(px,R, new[]{ new Vector2(nH.x+(sw-3)*s, nH.y+16f*s), new Vector2(nH.x+(sw+3)*s, nH.y+16f*s),
+                                  new Vector2(nH.x+(sw+7)*s, nH.y+23f*s), new Vector2(nH.x+(sw+1)*s, nH.y+22f*s) },
+                     ArtGoldHi, ArtGold, 1.4f*s);
             }
             SolSunDisc(px, R, 64f + (q == 4 ? 16f : (q == 3 ? 4f : 10f)), 62f, p, 1.0f, s);
         }
@@ -6976,11 +8622,13 @@ namespace NW.App
             int part = 0, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8, same four-beat fix as Crawler -- this is a bipedal walker (like Strider),
+            // not a wheeled/tracked vehicle, so its leg sweep gets the same smoothing.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
             Color b = ArtSteelBase(p), bh = ArtSteelHi(p), bd = ArtSteelDk(p), bf = ArtSteelFar(p);
-            float st  = q == 1 ? 1f : (q == 2 ? -1f : 0f);
+            float st  = q == 1 ? 1f : (q == 2 ? 0.33f : (q == 6 ? -0.33f : (q == 7 ? -1f : 0f)));
             P3DEllipseGlow(px,R, 64f*s, 15f*s, 32f*s, 7f*s, new Color(0f,0f,0f,0.45f));
 
             void Leg(float sx, float dir, Color tone)
@@ -7035,11 +8683,12 @@ namespace NW.App
         static void P3DBuildPhoenix(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
         {
             float s = R / 128f;
-            int q = Pose6(pose);
+            // Pose8: wing beat sweeps its range each cycle, same reasoning as Rogue/Ornithopter.
+            int q = Pose8(pose);
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
             Color b = ArtSteelBase(p), bh = ArtSteelHi(p), bd = ArtSteelDk(p), bf = ArtSteelFar(p);
-            float beat = q == 1 ? 12f : (q == 2 ? -10f : (Atk(q) ? 16f : 0f));
+            float beat = q == 1 ? 12f : (q == 2 ? 5f : (q == 6 ? -4f : (q == 7 ? -10f : (Atk(q) ? 16f : 0f))));
 
             SolFeatherRow(px, R, 60f, 62f, 178f - beat*0.6f, 30f, 5, bf, s);
             SolFeatherRow(px, R, 58f, 58f, 190f - beat*0.6f, 24f, 4,
@@ -7072,10 +8721,14 @@ namespace NW.App
         }
 
         // ---- PYROMANCER — Solar hacker -----------------------------------------
-        static void P3DBuildPyromancer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["pyromancer"] below. Unlike the
+        // hover-hacker units elsewhere, Pyromancer has real walking legs, so it gets the rig.
+        static void P3DBuildPyromancer(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -7086,6 +8739,7 @@ namespace NW.App
             Vector2 nE = V(J(8),J(9)), nH = V(J(10),J(11));
             Vector2 head = V((q == 5 ? 60 : 65) + sway, 102);
 
+            if (!rigged) {
             P3DLimb(px,R, shF.x,shF.y, J(12)*s,J(13)*s, 4.6f*s, bf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
             P3DLimb(px,R, hip.x,hip.y, fK.x,fK.y, 5.8f*s, bf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
             P3DLimb(px,R, fK.x,fK.y, fF.x,fF.y, 5.0f*s, bf, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
@@ -7094,9 +8748,10 @@ namespace NW.App
             foreach (var f in new[]{ fF, nF })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-7f*s,f.y+3f*s), new Vector2(f.x+8f*s,f.y+3f*s),
                                       new Vector2(f.x+6f*s,f.y-4f*s), new Vector2(f.x-6f*s,f.y-4f*s) },
-                         ArtLeather, new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f), 1.6f);
+                         ArtLeather, new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f), 1.6f*s);
             for (int w = 0; w < 3; w++)
                 DrawLineR(px,R, nK.x-5f*s, nK.y-(4f+w*4f)*s, nK.x+5f*s, nK.y-(3f+w*4f)*s, 1.4f*s, ArtGoldDk);
+            }
             P3DPlate(px,R, new[]{ V(55+sway,84), V(73+sway,84), V(74,64), V(68,50), V(58,50), V(52,64) },
                      ArtCloth, ArtClothDk, 2.2f);
             DrawLineR(px,R, 52f*s, 64f*s, 74f*s, 68f*s, 2.6f*s, ArtLeather);
@@ -7115,10 +8770,12 @@ namespace NW.App
                     new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.95f));
             P3DEllipseGlow(px,R, (54f+sway)*s, 88f*s, 13f*s, 9f*s,
                 new Color(ArtRune.r, ArtRune.g, ArtRune.b, Atk(q) ? 0.6f : 0.4f));
+            if (!rigged) {
             P3DLimb(px,R, shN.x,shN.y, nE.x,nE.y, 5.0f*s, ArtCloth, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
             P3DLimb(px,R, nE.x,nE.y, nH.x,nH.y, 4.4f*s, ArtCloth, p.metallic*.4f, p.smoothness*.5f, L,H,fillL);
+            }
             SolCage(px, R, head.x/s, head.y/s, p, s);
-            {
+            if (!rigged) {
                 float arc = q == 4 ? 38f : (q == 3 ? -16f : 8f);
                 float ax = (nH.x/s) + arc, ay = (nH.y/s) + (q == 4 ? 4f : -14f);
                 for (int ch = 0; ch < 4; ch++)
@@ -7133,10 +8790,15 @@ namespace NW.App
         // joints, so it inherits the walk/attack/flinch animation with no extra frames.
         // Steel takes the team tint (allegiance must still read); gold, cloth and leather are
         // fixed so the medieval SET holds together across both armies.
-        static void P3DBuildKnight(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["knight"] below. Same split as
+        // Cyber's Lancer: attack poses stay on the untouched baked draw below, idle/walk go
+        // through the live rig.
+        static void P3DBuildKnight(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -7161,8 +8823,9 @@ namespace NW.App
             P3DPlate(px, R, new[]{
                 V(56 - capeSway*0.2f, 88), V(72 - capeSway*0.2f, 88),
                 V(78 - capeSway, 40), V(70 - capeSway, 24), V(56 - capeSway, 24), V(50 - capeSway, 42)
-            }, livery, liveryDk, 2f);
+            }, livery, liveryDk, 2f*s);
 
+            if (!rigged) {
             // ── far limbs ───────────────────────────────────────────────────────
             P3DLimb(px, R, shF.x, shF.y, fElb.x, fElb.y, 5.0f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px, R, fElb.x, fElb.y, fHand.x, fHand.y, 4.4f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -7175,24 +8838,27 @@ namespace NW.App
             {   // greave plate rides the shin, rotated onto the limb
                 float gA = Mathf.Atan2(nFoot.y - nKnee.y, nFoot.x - nKnee.x) * Mathf.Rad2Deg + 90f;
                 Vector2 c0 = nKnee;
+                // gr's offsets are already scaled (V() does that), so adding them straight to
+                // c0 (also scaled) is consistent -- not the unscaled-anchor pattern.
                 var gr = new[]{ V(-6,4), V(6,4), V(5,-16), V(-5,-16) };
                 for (int i = 0; i < gr.Length; i++) gr[i] = RotP(new Vector2(c0.x + gr[i].x, c0.y + gr[i].y), c0, gA);
-                P3DPlate(px, R, gr, steelHi, steel, 1.8f);
+                P3DPlate(px, R, gr, steelHi, steel, 1.8f*s);
             }
             // boots
             P3DPlate(px, R, new[]{ new Vector2(nFoot.x-8f*s,nFoot.y+3f*s), new Vector2(nFoot.x+9f*s,nFoot.y+3f*s),
                                    new Vector2(nFoot.x+7f*s,nFoot.y-4f*s), new Vector2(nFoot.x-7f*s,nFoot.y-4f*s) },
-                     ArtLeather, new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f), 1.8f);
+                     ArtLeather, new Color(ArtLeather.r*0.45f, ArtLeather.g*0.45f, ArtLeather.b*0.45f), 1.8f*s);
+            }
 
             // ── cuirass ─────────────────────────────────────────────────────────
             P3DPlate(px, R, new[]{
                 V(52, 88), V(74, 88), V(76, 70), V(70, 54), V(56, 54), V(50, 70)
-            }, steelHi, steel, 2.2f);
+            }, steelHi, steel, 2.2f*s);
             // gold bands + heraldic diamond
             DrawLineR(px, R, 52f*s, 80f*s, 74f*s, 80f*s, 2.4f*s, ArtGold);
             DrawLineR(px, R, 54f*s, 64f*s, 72f*s, 64f*s, 1.8f*s, ArtGoldDk);
             DrawLineR(px, R, 51f*s, 72f*s, 75f*s, 84f*s, 3.4f*s, livery);   // livery sash
-            P3DPlate(px, R, new[]{ V(63,76), V(67,71), V(63,66), V(59,71) }, ArtGoldHi, ArtGold, 1.2f);
+            P3DPlate(px, R, new[]{ V(63,76), V(67,71), V(63,66), V(59,71) }, ArtGoldHi, ArtGold, 1.2f*s);
 
             // ── PAULDRONS: rotate with the arm, which is the shoulder fix ───────
             // These used to sit at a fixed point, so the shoulder stayed frozen while the arm
@@ -7204,9 +8870,10 @@ namespace NW.App
                                 new Vector2(9f*sc, -8f*sc),  new Vector2(-9f*sc, -8f*sc) };
                 for (int i = 0; i < pl.Length; i++)
                     pl[i] = RotP(new Vector2(sh.x + pl[i].x*s, sh.y + pl[i].y*s), sh, a);
-                P3DPlate(px, R, pl, hi, lo, 2f);
+                P3DPlate(px, R, pl, hi, lo, 2f*s);
                 DrawLineR(px, R, pl[2].x, pl[2].y, pl[3].x, pl[3].y, 1.8f*s, ArtGold);
             }
+            if (!rigged) {
             Pauldron(shF, fElb, steel, farDk, 0.86f);
 
             // ── near arm ────────────────────────────────────────────────────────
@@ -7221,52 +8888,53 @@ namespace NW.App
                                 new Vector2(0,-17), new Vector2(-9,-8) };
                 for (int i = 0; i < sk.Length; i++)
                     sk[i] = RotP(new Vector2(fHand.x + sk[i].x*s, fHand.y + sk[i].y*s), fHand, a);
-                P3DPlate(px, R, sk, steel, farDk, 2f);
+                P3DPlate(px, R, sk, steel, farDk, 2f*s);
                 DrawLineR(px, R, sk[0].x, sk[0].y, sk[3].x, sk[3].y, 2.4f*s, livery);
                 DrawLineR(px, R, sk[4].x, sk[4].y, sk[2].x, sk[2].y, 2.4f*s, livery);
+            }
             }
 
             // ── great-helm + plume ──────────────────────────────────────────────
             P3DPlate(px, R, new[]{                       // plume, behind the helm
                 new Vector2(head.x-2f*s, head.y+8f*s),  new Vector2(head.x-13f*s, head.y+26f*s),
                 new Vector2(head.x-6f*s, head.y+30f*s), new Vector2(head.x+3f*s, head.y+12f*s)
-            }, livery, liveryDk, 1.6f);
+            }, livery, liveryDk, 1.6f*s);
             P3DPlate(px, R, new[]{
                 new Vector2(head.x-11f*s, head.y-11f*s), new Vector2(head.x+11f*s, head.y-11f*s),
                 new Vector2(head.x+12f*s, head.y+7f*s),  new Vector2(head.x, head.y+13f*s),
                 new Vector2(head.x-12f*s, head.y+7f*s)
-            }, steelHi, steelDk, 2.2f);
+            }, steelHi, steelDk, 2.2f*s);
             // visor slit + crest
             P3DPlate(px, R, new[]{
                 new Vector2(head.x-9f*s, head.y-1f*s), new Vector2(head.x+9f*s, head.y-1f*s),
                 new Vector2(head.x+9f*s, head.y+2.6f*s), new Vector2(head.x-9f*s, head.y+2.6f*s)
-            }, new Color(0.05f,0.05f,0.08f), new Color(0.02f,0.02f,0.04f), 1f);
+            }, new Color(0.05f,0.05f,0.08f), new Color(0.02f,0.02f,0.04f), 1f*s);
             DrawLineR(px, R, head.x-8f*s, head.y+0.6f*s, head.x+8f*s, head.y+0.6f*s, 1.5f*s,
                       new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.85f));
             DrawLineR(px, R, head.x, head.y+13f*s, head.x, head.y-9f*s, 2.2f*s, ArtGold);
 
+            if (!rigged) {
             // ── runed greatsword in the weapon hand ─────────────────────────────
+            float swing = q == 4 ? 58f : (q == 3 ? -62f : (q == 5 ? -28f : -18f));
+            Vector2 dir = RotP(new Vector2(0f, 1f), Vector2.zero, swing);
+            Vector2 grip = nHand;
+            Vector2 tip  = new Vector2(grip.x + dir.x * 46f * s, grip.y + dir.y * 46f * s);
+            Vector2 gEnd = new Vector2(grip.x - dir.x * 9f * s,  grip.y - dir.y * 9f * s);
+            // grip + pommel
+            DrawLineR(px, R, grip.x, grip.y, gEnd.x, gEnd.y, 4.4f*s, ArtLeather);
+            FillCircleR(px, R, gEnd.x, gEnd.y, 3.4f*s, ArtGold);
+            // crossguard
+            Vector2 perp = new Vector2(-dir.y, dir.x);
+            DrawLineR(px, R, grip.x - perp.x*11f*s, grip.y - perp.y*11f*s,
+                             grip.x + perp.x*11f*s, grip.y + perp.y*11f*s, 4.2f*s, ArtGold);
+            // blade + runes
+            P3DBlade(px, R, new Vector2(grip.x + dir.x*3f*s, grip.y + dir.y*3f*s), tip, 3.4f*s, steelHi, steel);
+            for (int i = 1; i <= 3; i++)
             {
-                float swing = q == 4 ? 58f : (q == 3 ? -62f : (q == 5 ? -28f : -18f));
-                Vector2 dir = RotP(new Vector2(0f, 1f), Vector2.zero, swing);
-                Vector2 grip = nHand;
-                Vector2 tip  = new Vector2(grip.x + dir.x * 46f * s, grip.y + dir.y * 46f * s);
-                Vector2 gEnd = new Vector2(grip.x - dir.x * 9f * s,  grip.y - dir.y * 9f * s);
-                // grip + pommel
-                DrawLineR(px, R, grip.x, grip.y, gEnd.x, gEnd.y, 4.4f*s, ArtLeather);
-                FillCircleR(px, R, gEnd.x, gEnd.y, 3.4f*s, ArtGold);
-                // crossguard
-                Vector2 perp = new Vector2(-dir.y, dir.x);
-                DrawLineR(px, R, grip.x - perp.x*11f*s, grip.y - perp.y*11f*s,
-                                 grip.x + perp.x*11f*s, grip.y + perp.y*11f*s, 4.2f*s, ArtGold);
-                // blade + runes
-                P3DBlade(px, R, new Vector2(grip.x + dir.x*3f*s, grip.y + dir.y*3f*s), tip, 3.4f*s, steelHi, steel);
-                for (int i = 1; i <= 3; i++)
-                {
-                    float f = 0.28f + i * 0.20f;
-                    P3DEllipseGlow(px, R, grip.x + dir.x*46f*s*f, grip.y + dir.y*46f*s*f,
-                        2.6f*s, 2.6f*s, new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.8f));
-                }
+                float f = 0.28f + i * 0.20f;
+                P3DEllipseGlow(px, R, grip.x + dir.x*46f*s*f, grip.y + dir.y*46f*s*f,
+                    2.6f*s, 2.6f*s, new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.8f));
+            }
             }
         }
 
@@ -7278,10 +8946,13 @@ namespace NW.App
         // breastplate, hazard-striped hard hat, tool belt, and a rivet gun that kicks on the
         // strike. Iron takes the team bias; the hazard yellow and copper stay fixed so both
         // armies read as the same foundry.
-        static void P3DBuildWorker(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL, int pose = 0)
+        // part 3 = torso/head only, no limbs -- see _rigs["worker"] below.
+        static void P3DBuildWorker(Color[] px, int R, P3DP p, Vector3 L, Vector3 H, Vector3 fillL,
+            int part = 0, int pose = 0)
         {
             float s = R / 128f;
             int q = Pose8(pose);
+            bool rigged = part == 3;
             float J(int c) => SideJoints[q, c];
             Vector2 V(float x, float y) => new Vector2(x * s, y * s);
 
@@ -7301,6 +8972,7 @@ namespace NW.App
             Vector2 fElb  = V(J(12), J(13)), fHand = V(J(14), J(15));
             Vector2 head  = V(q == 5 ? 61 : 66, 103);
 
+            if (!rigged) {
             // far limbs
             P3DLimb(px,R, shF.x, shF.y, fElb.x, fElb.y, 5.0f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
             P3DLimb(px,R, fElb.x, fElb.y, fHand.x, fHand.y, 4.4f*s, farDk, p.metallic*.5f, p.smoothness*.6f, L,H,fillL);
@@ -7313,7 +8985,7 @@ namespace NW.App
             foreach (var f in new[]{ fFoot, nFoot })
                 P3DPlate(px,R, new[]{ new Vector2(f.x-8f*s, f.y+4f*s), new Vector2(f.x+10f*s, f.y+4f*s),
                                       new Vector2(f.x+8f*s, f.y-5f*s), new Vector2(f.x-7f*s, f.y-5f*s) },
-                         ironDk, farDk, 1.8f);
+                         ironDk, farDk, 1.8f*s);
 
             // knee pad on the near leg, rotated onto the shin
             {
@@ -7321,14 +8993,15 @@ namespace NW.App
                 var kp = new[]{ V(-6,3), V(6,3), V(5,-9), V(-5,-9) };
                 for (int i = 0; i < kp.Length; i++)
                     kp[i] = RotP(new Vector2(nKnee.x + kp[i].x, nKnee.y + kp[i].y), nKnee, kA);
-                P3DPlate(px,R, kp, iron, ironDk, 1.6f);
+                P3DPlate(px,R, kp, iron, ironDk, 1.6f*s);
+            }
             }
 
             // overalls
             P3DPlate(px,R, new[]{ V(52,86), V(74,86), V(76,66), V(70,50), V(56,50), V(50,66) },
-                     canvas, canvasDk, 2.2f);
+                     canvas, canvasDk, 2.2f*s);
             // riveted breastplate over the bib
-            P3DPlate(px,R, new[]{ V(55,84), V(73,84), V(74,68), V(56,68) }, ironHi, iron, 2f);
+            P3DPlate(px,R, new[]{ V(55,84), V(73,84), V(74,68), V(56,68) }, ironHi, iron, 2f*s);
             IndRivets(px,R, 58, 81, 71, 81, 4, ironDk, s);
             IndRivets(px,R, 58, 70, 71, 70, 4, ironDk, s);
             IndGauge (px,R, 66, 76, 5.0f, 0.55f, s);   // shares the set's brass dial
@@ -7340,6 +9013,7 @@ namespace NW.App
                 DrawLineR(px,R, (56f + i*7f)*s, 61f*s, (56f + i*7f)*s, 53f*s, 1.6f*s, ironDk);
             DrawLineR(px,R, 51f*s, 74f*s, 57f*s, 78f*s, 4f*s, livery);           // livery armband
 
+            if (!rigged) {
             // shoulder pad follows the near arm, same trick as the knight pauldron
             void Pad(Vector2 sh, Vector2 elb, Color hi, Color lo, float sc)
             {
@@ -7348,7 +9022,7 @@ namespace NW.App
                                 new Vector2(8f*sc, -7f*sc),  new Vector2(-8f*sc, -7f*sc) };
                 for (int i = 0; i < pl.Length; i++)
                     pl[i] = RotP(new Vector2(sh.x + pl[i].x*s, sh.y + pl[i].y*s), sh, a);
-                P3DPlate(px,R, pl, hi, lo, 1.8f);
+                P3DPlate(px,R, pl, hi, lo, 1.8f*s);
                 DrawLineR(px,R, pl[0].x, pl[0].y, pl[1].x, pl[1].y, 1.6f*s, hazard);
             }
             Pad(shF, fElb, iron, farDk, 0.85f);
@@ -7358,20 +9032,22 @@ namespace NW.App
             P3DLimb(px,R, nElb.x, nElb.y, nHand.x, nHand.y, 4.8f*s, canvas, 0.1f, 0.2f, L,H,fillL);
             Pad(shN, nElb, ironHi, iron, 1.0f);
             P3DSphere(px,R, nHand.x, nHand.y, 4.2f*s, strap, 0.1f, 0.2f, L,H,fillL);   // work glove
+            }
 
             // head + hazard-striped hard hat
             P3DPlate(px,R, new[]{ new Vector2(head.x-8f*s, head.y-9f*s), new Vector2(head.x+8f*s, head.y-9f*s),
                                   new Vector2(head.x+8f*s, head.y+5f*s), new Vector2(head.x-8f*s, head.y+5f*s) },
-                     new Color(0.62f,0.47f,0.36f), new Color(0.38f,0.27f,0.20f), 1.6f);
+                     new Color(0.62f,0.47f,0.36f), new Color(0.38f,0.27f,0.20f), 1.6f*s);
             P3DEllipseGlow(px,R, head.x+3f*s, head.y-1f*s, 2.4f*s, 2.0f*s, new Color(0.06f,0.05f,0.05f,0.95f));
             DrawLineR(px,R, head.x-7f*s, head.y-7f*s, head.x+7f*s, head.y-7f*s, 2f*s, soot);  // grime
             P3DPlate(px,R, new[]{                                             // dome
                 new Vector2(head.x-11f*s, head.y+5f*s),  new Vector2(head.x-8f*s, head.y+14f*s),
                 new Vector2(head.x+6f*s, head.y+15f*s),  new Vector2(head.x+11f*s, head.y+6f*s)
-            }, hazard, hazardDk, 2f);
+            }, hazard, hazardDk, 2f*s);
             DrawLineR(px,R, head.x-14f*s, head.y+5f*s, head.x+15f*s, head.y+5f*s, 2.8f*s, hazard);  // brim
             DrawLineR(px,R, head.x-3f*s, head.y+14f*s, head.x-1f*s, head.y+6f*s, 1.8f*s, hazardDk); // rib
 
+            if (!rigged) {
             // rivet gun: kicks back on the strike, lowered on the windup
             {
                 float kick = q == 4 ? 10f : (q == 3 ? -5f : 2f);
@@ -7381,11 +9057,12 @@ namespace NW.App
                 P3DPlate(px,R, new[]{                                          // hopper
                     new Vector2(nHand.x+5f*s, nHand.y+5f*s),  new Vector2(nHand.x+13f*s, nHand.y+5f*s),
                     new Vector2(nHand.x+12f*s, nHand.y+12f*s), new Vector2(nHand.x+6f*s, nHand.y+12f*s)
-                }, ArtGoldHi, ArtGold, 1.4f);
+                }, ArtGoldHi, ArtGold, 1.4f*s);
                 DrawLineR(px,R, nHand.x-2f*s, nHand.y, nHand.x-2f*s, nHand.y-8f*s, 3f*s, strap); // grip
                 if (q == 4)
                     P3DEllipseGlow(px,R, muzzle.x + 6f*s, muzzle.y, 8f*s, 6f*s,
                         new Color(ArtRune.r, ArtRune.g, ArtRune.b, 0.75f));
+            }
             }
         }
 
@@ -7800,33 +9477,50 @@ namespace NW.App
         }
 
         /// <summary>Scanline-fill a polygon with a vertical gradient (top colour → bottom colour).</summary>
+        // Scanline fill for every plate/panel in the game (armor, shields, wings, hull
+        // panels). Used to sample the crossing test at the integer row and cut left/right
+        // spans with Ceil/Floor, discarding the fractional pixel at every slanted edge --
+        // that's what made every panel edge in the game read as a hard, stair-stepped line
+        // next to P3DLimb's already-antialiased capsules. Sampling at the row's pixel centre
+        // and blending fractional coverage on the boundary columns brings plates up to the
+        // same edge quality.
         static void P3DPolyGrad(Color[] px, int R, Vector2[] pts, Color top, Color bot)
         {
             if (pts.Length < 3) return;
             float minY = float.MaxValue, maxY = float.MinValue;
             foreach (var q in pts) { if (q.y < minY) minY = q.y; if (q.y > maxY) maxY = q.y; }
             float span = Mathf.Max(0.001f, maxY - minY);
-            int y0 = Mathf.Max(0, (int)minY), y1 = Mathf.Min(R - 1, (int)maxY + 1);
+            int y0 = Mathf.Max(0, (int)minY - 1), y1 = Mathf.Min(R - 1, (int)maxY + 1);
             var xs = new System.Collections.Generic.List<float>(8);
 
             for (int y = y0; y <= y1; y++)
             {
+                float yc = y + 0.5f;
                 xs.Clear();
                 for (int i = 0, n = pts.Length; i < n; i++)
                 {
                     Vector2 a = pts[i], b = pts[(i + 1) % n];
-                    if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y))
-                        xs.Add(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x));
+                    if ((a.y <= yc && b.y > yc) || (b.y <= yc && a.y > yc))
+                        xs.Add(a.x + (yc - a.y) / (b.y - a.y) * (b.x - a.x));
                 }
                 if (xs.Count < 2) continue;
                 xs.Sort();
-                float t = (y - minY) / span;
+                float t = Mathf.Clamp01((yc - minY) / span);
                 Color c = Color.Lerp(top, bot, t);
                 for (int k = 0; k + 1 < xs.Count; k += 2)
                 {
-                    int xa = Mathf.Max(0, Mathf.CeilToInt(xs[k]));
-                    int xb = Mathf.Min(R - 1, Mathf.FloorToInt(xs[k + 1]));
-                    for (int x = xa; x <= xb; x++) P3DSet(px, R, x, y, c);
+                    float xL = xs[k], xR = xs[k + 1];
+                    if (xR <= xL) continue;
+                    int xa = Mathf.Max(0, Mathf.FloorToInt(xL));
+                    int xb = Mathf.Min(R - 1, Mathf.CeilToInt(xR) - 1);
+                    for (int x = xa; x <= xb; x++)
+                    {
+                        float cov = Mathf.Clamp01(Mathf.Min(x + 1f, xR) - Mathf.Max((float)x, xL));
+                        if (cov <= 0f) continue;
+                        if (cov >= 0.999f) { P3DSet(px, R, x, y, c); continue; }
+                        var s = c; s.a *= cov;
+                        P3DSet(px, R, x, y, s);
+                    }
                 }
             }
         }
@@ -7845,6 +9539,23 @@ namespace NW.App
         static void P3DPlate(Color[] px, int R, Vector2[] pts, Color top, Color bot, float outlineW = 2f)
         {
             P3DPolyGrad(px, R, pts, top, bot);
+            P3DPolyLine(px, R, pts, ArtOutline, outlineW);
+        }
+
+        /// <summary>Lit variant of P3DPlate: biases the fill toward the scene's actual key-light
+        /// direction and adds a soft catch-light, instead of a fixed vertical fade. P3DLimb already
+        /// computes real per-pixel Blinn-Phong shading from L/H; flat plates sitting next to a lit
+        /// limb read as "crayon" by contrast. Cyber-theme call sites only — other themes' plates
+        /// are untouched.</summary>
+        static void P3DPlateLit(Color[] px, int R, Vector2[] pts, Color top, Color bot,
+            Vector3 L, Vector3 H, float outlineW = 2f)
+        {
+            var N = new Vector3(-0.10f * Mathf.Sign(L.x + 0.0001f), 0.14f, 0.985f).normalized;
+            float diff = Mathf.Clamp01(Vector3.Dot(N, L));
+            float spec = Mathf.Pow(Mathf.Max(0f, Vector3.Dot(N, H)), 50f);
+            Color hiLit = Color.Lerp(top, Color.white, spec * 0.5f);
+            Color loLit = bot * Mathf.Lerp(0.80f, 1.0f, diff);
+            P3DPolyGrad(px, R, pts, hiLit, loLit);
             P3DPolyLine(px, R, pts, ArtOutline, outlineW);
         }
 
@@ -7933,9 +9644,16 @@ namespace NW.App
                 Strap = new Color(0.18f,0.14f,0.26f), Cloth = new Color(0.30f,0.12f,0.44f), ClothDk = new Color(0.14f,0.05f,0.22f),
                 Rune = new Color(0.95f,0.40f,1.00f), Outline = new Color(0.050f,0.030f,0.080f,1f) },
             // 2 BIOPUNK - bone chitin, acid emissive
+            // Cloth/ClothDk carry the main torso plate on Mutant/Carapace/Mycelium -- the
+            // biggest shape on the unit, unlike other themes where Cloth is a minor accent --
+            // and the original ClothDk (0.09,0.16,0.07) sat almost exactly on top of this
+            // theme's own deploy-card background (bgCard ≈ 0.047,0.118,0.063, near-identical
+            // luminance), so the torso all but vanished into the card at icon scale. Lifted
+            // both a step brighter, same hue, so the plate still reads as dark chitin but
+            // actually separates from the card behind it.
             new ArtSet { Metal = new Color(0.560f,0.560f,0.470f),
                 Trim = new Color(0.78f,0.74f,0.48f), TrimHi = new Color(0.94f,0.92f,0.72f), TrimDk = new Color(0.36f,0.34f,0.16f),
-                Strap = new Color(0.34f,0.26f,0.18f), Cloth = new Color(0.22f,0.34f,0.16f), ClothDk = new Color(0.09f,0.16f,0.07f),
+                Strap = new Color(0.34f,0.26f,0.18f), Cloth = new Color(0.30f,0.46f,0.22f), ClothDk = new Color(0.15f,0.25f,0.12f),
                 Rune = new Color(0.40f,1.00f,0.45f), Outline = new Color(0.030f,0.055f,0.035f,1f) },
             // 3 MEDIEVAL - the original values; do not drift
             new ArtSet { Metal = new Color(0.585f,0.625f,0.700f),
@@ -8017,6 +9735,20 @@ namespace NW.App
                 Color lit = col * (0.15f + diff * 0.85f + fill)
                           + Color.white * (spec * Mathf.Lerp(0.05f, 0.85f, metallic) * smoothness)
                           + new Color(0.35f, 0.45f, 0.65f, 0f) * rim;
+
+                // Crisp outline band at the silhouette edge. P3DPlate strokes every panel
+                // explicitly; a bare P3DLimb capsule only faded to transparent, so limbs never
+                // carried the same drawn-line language as the plates sitting right next to
+                // them -- that mismatch is what read as unfinished next to clean vector art.
+                float outlineW = Mathf.Clamp(r * 0.24f, 1.3f, 3.0f);
+                float edgeT = Mathf.Clamp01((d - (r - outlineW)) / (outlineW * 0.6f));
+                if (edgeT > 0f)
+                {
+                    Color oc = ArtOutline;
+                    lit = new Color(Mathf.Lerp(lit.r, oc.r, edgeT), Mathf.Lerp(lit.g, oc.g, edgeT),
+                                     Mathf.Lerp(lit.b, oc.b, edgeT), lit.a);
+                }
+
                 lit.a = col.a * Mathf.Clamp01((r - d) * 1.6f);
                 P3DSet(px, R, x, y, lit);
             }
@@ -8093,16 +9825,25 @@ namespace NW.App
             }
         }
 
+        // Every DrawLineR call — and through it every outline, panel gap and accent line in
+        // the game — is built from stamping this circle repeatedly. It used to be a hard
+        // inside/outside test with no edge softening, so every stroke in the game rasterized
+        // with a visible staircase. A ~1px coverage falloff at the boundary is enough to read
+        // as a clean drawn line instead of a blocky one, at effectively no extra cost.
         static void FillCircleR(Color[] px, int R, float cx, float cy, float r, Color c)
         {
-            int x0 = Mathf.Max(0, (int)(cx - r)), x1 = Mathf.Min(R - 1, (int)(cx + r));
-            int y0 = Mathf.Max(0, (int)(cy - r)), y1 = Mathf.Min(R - 1, (int)(cy + r));
-            float r2 = r * r;
+            int x0 = Mathf.Max(0, (int)(cx - r - 1f)), x1 = Mathf.Min(R - 1, (int)(cx + r + 1f));
+            int y0 = Mathf.Max(0, (int)(cy - r - 1f)), y1 = Mathf.Min(R - 1, (int)(cy + r + 1f));
             for (int x = x0; x <= x1; x++)
                 for (int y = y0; y <= y1; y++)
                 {
                     float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
-                    if (dx * dx + dy * dy <= r2) P3DSet(px, R, x, y, c);
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float cov = Mathf.Clamp01(r - d + 0.5f);
+                    if (cov <= 0f) continue;
+                    if (cov >= 1f) { P3DSet(px, R, x, y, c); continue; }
+                    var s = c; s.a *= cov;
+                    P3DSet(px, R, x, y, s);
                 }
         }
 
