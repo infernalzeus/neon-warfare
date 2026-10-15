@@ -9,11 +9,28 @@ namespace NW.App
     /// hip/knee bend BattlefieldView drives, instead of jump-cutting between pose frames.
     /// Construction mirrors BattlefieldView's own rig setup exactly (same pivot math, same
     /// parenting), so a preview built here lands in the same place a battlefield unit would.
-    /// BattlefieldView's own rig code is left untouched; this is only for the two contexts
-    /// that never had rig support at all.
+    /// ConfigureSegment is shared with BattlefieldView so preview and combat geometry agree.
     /// </summary>
     public static class LimbRigView
     {
+        /// <summary>Register full-canvas art layers in the same rectangle, then rotate
+        /// about their authored joint. A centred anchor is relative to the parent's RECT
+        /// centre, not its pivot: subtracting a parent hip from a child's knee here offsets
+        /// the shin twice. UV-mirrored art also needs a mirrored pivot, not just negated angles.
+        /// Preview hosts already mirrored with localScale must leave mirrorTexture false.</summary>
+        public static void ConfigureSegment(RectTransform segment, RectTransform parent,
+            Vector2 size, Vector2 joint, bool mirrorTexture = false)
+        {
+            if (mirrorTexture) joint.x = 1f - joint.x;
+            segment.SetParent(parent, false);
+            segment.localScale = Vector3.one;
+            segment.sizeDelta = size;
+            segment.pivot = joint;
+            segment.anchorMin = segment.anchorMax = new Vector2(0.5f, 0.5f);
+            segment.anchoredPosition = Vector2.Scale(joint - new Vector2(0.5f, 0.5f), size);
+            segment.localRotation = Quaternion.identity;
+        }
+
         public static RawImage[] Build(RectTransform hostRt, string artId, bool isPlayer)
         {
             // hostRt.sizeDelta is only the actual pixel size for a fixed-size RectTransform.
@@ -34,15 +51,7 @@ namespace NW.App
                 var img = lgo.AddComponent<RawImage>();
                 img.raycastTarget = false;
                 limbs[li] = img;
-                lr.sizeDelta = size;
-                lr.pivot = info.Joint;
-                lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
-                lr.anchoredPosition = info.Parent >= 0
-                    ? new Vector2((info.Joint.x - NeonArt.LimbInfo(artId, info.Parent).Joint.x) * size.x,
-                                  (info.Joint.y - NeonArt.LimbInfo(artId, info.Parent).Joint.y) * size.y)
-                    : new Vector2((info.Joint.x - 0.5f) * size.x,
-                                  (info.Joint.y - 0.5f) * size.y);
-                lr.localRotation = Quaternion.identity;
+                ConfigureSegment(lr, parentRt, size, info.Joint);
                 img.texture = NeonArt.UnitLimb(artId, isPlayer, li);
                 img.enabled = false;
                 if (info.Parent < 0)
@@ -103,11 +112,7 @@ namespace NW.App
                 var img = go.AddComponent<RawImage>();
                 img.raycastTarget = false;
                 rotors[side] = img;
-                rt.sizeDelta = size;
-                Vector2 hub = NeonArt.RotorHub01(side);
-                rt.pivot = hub;
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = new Vector2((hub.x - 0.5f) * size.x, (hub.y - 0.5f) * size.y);
+                ConfigureSegment(rt, hostRt, size, NeonArt.RotorHub01(side));
                 img.texture = NeonArt.UnitRotor(artId, isPlayer, side);
                 img.enabled = false;
             }

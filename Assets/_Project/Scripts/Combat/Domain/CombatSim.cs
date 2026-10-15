@@ -22,6 +22,15 @@ namespace NW.Combat.Domain
         public const int LaneCount = 4;
         public const float LaneLength = 100f;
 
+        /// <summary>How many of the GroundLanes are actually in play this match (2026-09-28,
+        /// difficulty-by-lane-count). Early levels open fewer lanes so a beginner match reads
+        /// as simpler and each unit gets more screen room; later levels open all GroundLanes.
+        /// Array sizes (_pylons, Frontline) stay allocated at the full GroundLanes regardless --
+        /// only spawn-lane selection, the director's wave targeting, and the SURGE majority
+        /// threshold below read this. A dormant lane's pylons simply never see a unit cross
+        /// them, so they stay Neutral and don't skew anyone's ControlledLanes count.</summary>
+        public readonly int ActiveGroundLanes;
+
         /// <summary>How far along its lane a unit materialises. Was 2 -- two percent of the
         /// lane, which put every spawn inside the core sprite, so a deploy effect played
         /// underneath the core and could not be seen at all. 8 clears the core and gives the
@@ -66,12 +75,16 @@ namespace NW.Combat.Domain
         private ulong _nextId = 1;
         private readonly int[] _activeCount = new int[2];
 
-        public CombatSim(float playerCoreHp, float enemyCoreHp, DirectorConfig director, Rng rng)
+        public CombatSim(float playerCoreHp, float enemyCoreHp, DirectorConfig director, Rng rng,
+            int activeGroundLanes = GroundLanes)
         {
             PlayerCoreHp = PlayerCoreMax = playerCoreHp;
             EnemyCoreHp = EnemyCoreMax = enemyCoreHp;
             _director = director;
             _rng = rng;
+            ActiveGroundLanes = activeGroundLanes < 1 ? 1
+                              : activeGroundLanes > GroundLanes ? GroundLanes
+                              : activeGroundLanes;
             for (int lane = 0; lane < GroundLanes; lane++)
                 for (int i = 0; i < 2; i++)
                     _pylons[lane * 2 + i] = new PylonState
@@ -91,9 +104,12 @@ namespace NW.Combat.Domain
         {
             if (Finished || _activeCount[(int)team] >= MaxActivePerTeam) return -1;
 
+            // A dormant (not-yet-active) ground lane is never a valid spawn target -- an
+            // explicit choice there falls back to a random ACTIVE lane, same as no choice at
+            // all, rather than let a unit appear in a lane the level hasn't opened yet.
             lane = spec.IsAir ? AirLane
-                : lane is >= 0 and < GroundLanes ? lane
-                : _rng.Next(GroundLanes);
+                : lane >= 0 && lane < ActiveGroundLanes ? lane
+                : _rng.Next(ActiveGroundLanes);
 
             // Only turret/hacker (SpawnAtPylon) deploy from owned pylons.
             // All other units — including all enemy units — always spawn at their core.
@@ -527,8 +543,12 @@ namespace NW.Combat.Domain
 
         private void UpdateSurge()
         {
-            Owner surge = ControlledLanes(Owner.Player) >= 2 ? Owner.Player
-                        : ControlledLanes(Owner.Enemy) >= 2 ? Owner.Enemy
+            // Majority of the lanes actually in play, not a hardcoded 2 -- a 1-lane early
+            // level needs 1 (all of it), a 3-lane full level needs 2, matching the original
+            // "2 of 3" balance exactly when ActiveGroundLanes == GroundLanes.
+            int majority = ActiveGroundLanes / 2 + 1;
+            Owner surge = ControlledLanes(Owner.Player) >= majority ? Owner.Player
+                        : ControlledLanes(Owner.Enemy) >= majority ? Owner.Enemy
                         : Owner.Neutral;
             if (surge == SurgeOwner) return;
             if (SurgeOwner != Owner.Neutral)
@@ -621,7 +641,7 @@ namespace NW.Combat.Domain
             bool defend = _rng.Next01() < 0.6f;
             int best = 0;
             float bestVal = defend ? float.MinValue : float.MaxValue;
-            for (int lane = 0; lane < GroundLanes; lane++)
+            for (int lane = 0; lane < ActiveGroundLanes; lane++)
             {
                 float f = Frontline[lane];
                 if (defend ? f > bestVal : f < bestVal) { bestVal = f; best = lane; }

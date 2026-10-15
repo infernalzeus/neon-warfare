@@ -38,8 +38,12 @@ namespace NW.App
         // ── Icon sizes — use sizeDelta, never anchor percentages for icons ───
         public const float IconGemBoard   = 52f;   // Gem icon on match board cells
         public const float IconGemHUD     = 22f;   // Gem icon in sidebar / cost row
-        public const float IconUnitCard   = 48f;   // Unit icon in deploy card strip
-        public const float IconUnitDetail = 40f;   // Unit icon in level-select detail panel
+        public const float IconUnitCard   = 58f;   // Unit icon in deploy card strip (was 48 -- painted troop art reads better bigger, per user request 2026-09-27)
+        public const float IconUnitDetail = 48f;   // Unit icon in level-select detail panel (was 40, same request)
+        public const float IconGemCost    = 18f;   // Gem icon in deploy-card cost row (was 13, too small per Codex UI audit 2026-09-28)
+
+        // ── Tooltip ───────────────────────────────────────────────────────────
+        public const float TooltipWidth = 290f;   // Panel width -- was a bare literal in TooltipSystem.cs
 
         // ── Padding & spacing ─────────────────────────────────────────────────
         public const float PadOuter   = 20f;   // Distance from screen edges

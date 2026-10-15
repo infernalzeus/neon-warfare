@@ -31,7 +31,7 @@ namespace NW.App
             _rt = _go.AddComponent<RectTransform>();
             _rt.anchorMin = _rt.anchorMax = new Vector2(0.5f, 0.5f);
             _rt.pivot = new Vector2(0f, 1f);
-            _rt.sizeDelta = new Vector2(290, 72);
+            _rt.sizeDelta = new Vector2(UIScale.TooltipWidth, 72);
             // Never block pointer events — tooltip appearing near cursor must not fire OnPointerExit on the target below
             var cg = _go.AddComponent<CanvasGroup>();
             cg.blocksRaycasts = false;
@@ -65,7 +65,7 @@ namespace NW.App
             titleRt.anchorMin = new Vector2(0f, 0.52f); titleRt.anchorMax = new Vector2(1f, 1f);
             titleRt.offsetMin = new Vector2(10, 0); titleRt.offsetMax = new Vector2(-8, -4);
             _titleTxt = titleGo.AddComponent<Text>();
-            _titleTxt.font = font; _titleTxt.fontSize = 12; _titleTxt.fontStyle = FontStyle.Bold;
+            _titleTxt.font = font; _titleTxt.fontSize = UIScale.FontSmall; _titleTxt.fontStyle = FontStyle.Bold;
             _titleTxt.color = new Color(0.15f, 0.95f, 1.0f);
             _titleTxt.alignment = TextAnchor.LowerLeft;
             _titleTxt.raycastTarget = false;
@@ -85,7 +85,7 @@ namespace NW.App
             bodyRt.anchorMin = new Vector2(0f, 0f); bodyRt.anchorMax = new Vector2(1f, 0.52f);
             bodyRt.offsetMin = new Vector2(10, 4); bodyRt.offsetMax = new Vector2(-8, 0);
             _bodyTxt = bodyGo.AddComponent<Text>();
-            _bodyTxt.font = font; _bodyTxt.fontSize = 10;
+            _bodyTxt.font = font; _bodyTxt.fontSize = UIScale.FontTiny;
             _bodyTxt.color = new Color(0.72f, 0.82f, 0.92f);
             _bodyTxt.alignment = TextAnchor.UpperLeft;
             _bodyTxt.raycastTarget = false;
@@ -93,14 +93,26 @@ namespace NW.App
             _go.SetActive(false);
         }
 
+        // Chrome above the body text: title row + divider + top/bottom padding. Combined with
+        // the body's own MEASURED height below (not a char-count guess), this is what the old
+        // "44 + estimatedLines * 16" formula was approximating badly -- a proportional-length
+        // heuristic doesn't know about word wrap, so a handful of long words could wrap to more
+        // lines than the char count predicted and clip, or the guess could overshoot for text
+        // that wrapped better than average (Codex UI audit P1).
+        const float ChromeHeight = 44f;
+        const float MinHeight = 50f, MaxHeight = 260f;
+
         public static void Show(string title, string body, Vector2 screenPos)
         {
             if (_go == null || _canvas == null) return;
             _titleTxt.text = title;
             _bodyTxt.text  = body;
 
-            int estimatedLines = Mathf.Max(1, Mathf.CeilToInt(body.Length / 34f));
-            _rt.sizeDelta = new Vector2(290, 44 + estimatedLines * 16);
+            float bodyWidth = UIScale.TooltipWidth - 18f; // matches body's offsetMin(10)/offsetMax(-8)
+            var genSettings = _bodyTxt.GetGenerationSettings(new Vector2(bodyWidth, 0f));
+            float bodyHeight = _bodyTxt.cachedTextGenerator.GetPreferredHeight(body, genSettings);
+            float panelHeight = Mathf.Clamp(ChromeHeight + bodyHeight, MinHeight, MaxHeight);
+            _rt.sizeDelta = new Vector2(UIScale.TooltipWidth, panelHeight);
 
             var canvasRt = _canvas.GetComponent<RectTransform>();
             Vector2 local;

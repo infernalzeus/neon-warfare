@@ -49,8 +49,27 @@ namespace NW.App
             return _softDot;
         }
 
+        // ── currency art pack (2026-09-27) ──────────────────────────────────────
+        // Static, painted, universal-across-themes replacements for the procedural gem/
+        // token icons below -- one image per gem kind (0 energy/gold .. 4 data/silver,
+        // matching BuildGem's own kind switch) plus one shard-cluster token, all loaded
+        // from Resources/Currency. Gated separately from GameSettings.UseSpritePackArt
+        // (troops) so either can be switched off without touching the other.
+        public static Texture2D GemArt(int kind)
+            => Get($"gemart_{kind}", () => Resources.Load<Texture2D>($"Currency/gem{kind}"));
+
+        public static Texture2D TokenArt()
+            => Get("tokenart", () => Resources.Load<Texture2D>("Currency/token"));
+
         public static Texture2D TokenIcon(int phase = 0)
-            => Get($"tokenicon_{phase}_t{ArtThemeIdx}", () => BuildTokenIcon(phase));
+        {
+            if (GameSettings.UseGemArtPack)
+            {
+                var art = TokenArt();
+                if (art != null) return art;
+            }
+            return Get($"tokenicon_{phase}_t{ArtThemeIdx}", () => BuildTokenIcon(phase));
+        }
 
         static Texture2D BuildTokenIcon(int phase)
         {
@@ -111,7 +130,14 @@ namespace NW.App
         }
 
         public static Texture2D Gem(int kind, int style = 0)
-            => Get($"gem{kind}_{style}", () => BuildGem(kind, style));
+        {
+            if (GameSettings.UseGemArtPack)
+            {
+                var art = GemArt(kind);
+                if (art != null) return art;
+            }
+            return Get($"gem{kind}_{style}", () => BuildGem(kind, style));
+        }
 
         // pose: 0 neutral stance · 1 stride (legs apart) · 2 pass (legs together, foot lifted)
         public static Texture2D Unit(string id, bool player, int pose = 0)
@@ -156,6 +182,65 @@ namespace NW.App
         /// <summary>True when this art id has a separate weapon layer.</summary>
         public static bool HasWeaponPart(string id)
             => id is "mech" or "siege" or "turret" or "titan";
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  SPRITE-PACK FLIPBOOK (32/72 units) -- an externally-authored painted
+        //  art pack, imported as plain 2D textures under Resources/TroopSheets and
+        //  played back by SpriteSheetView.cs via RawImage.uvRect grid-stepping.
+        //  Every id here is already in IsAuthoredArt, so the existing 22% team-tint
+        //  lerp already applies correctly -- no separate tint path needed.
+        //  Not a Unity Sprite/Animator asset: this project has never used either,
+        //  and uvRect stepping over a plain Texture2D matches the one existing
+        //  flipbook precedent (the Zeus-intro sheets) instead of introducing a new
+        //  asset pipeline for 32 units while the other 40 stay procedural.
+        // ══════════════════════════════════════════════════════════════════════
+
+        /// <summary>True when this art id has a painted flipbook sheet set (standard variant
+        /// only for now) instead of / in addition to the procedural NeonArt.Unit() path.
+        /// Gated at the call site by GameSettings.UseSpritePackArt so it can be switched off
+        /// wholesale without touching this list. All 72/72 units are covered as of the
+        /// 2026-09-27 "remaining 40" pack -- Stinger/Crawler/Hive (Biopunk's multi-leg live
+        /// rig units) got a genuine multi-leg-appropriate flipbook (4/6/6 legs respectively),
+        /// not a biped substitution, so this list needs no special-casing for leg count: a
+        /// flipbook sheet doesn't care how many legs are drawn INTO its frames.</summary>
+        public static bool UsesSpriteSheet(string id)
+            => id is "kami" or "cybtrooper" or "cybsniper" or "cybtitan" or "cybshield"
+                  or "synracer" or "synlaser" or "synbouncer" or "synobelisk"
+                  or "mutant" or "carapace"
+                  or "knight" or "archer" or "paladin"
+                  or "worker" or "gunner" or "bulkhead" or "engineer"
+                  or "shinobi" or "yumi" or "shrine"
+                  or "guardian" or "raycaster" or "aegis" or "pyromancer"
+                  or "seeker" or "ward"
+                  or "cybdrone" or "cybmech" or "cybinter" or "cybhacker" or "cybturret"
+                  // remaining 40 (2026-09-27)
+                  or "synbot" or "syncruiser" or "synspeeder" or "synkeytar" or "synpylon"
+                  or "spore" or "stinger" or "crawler" or "swarm" or "mycelium" or "hive" or "pod"
+                  or "pigeon" or "siege" or "rogue" or "wizard" or "golem" or "ballista"
+                  or "rivetbot" or "crane" or "ornithopter" or "furnace" or "gatling"
+                  or "wisp" or "tanuki" or "kite" or "onmyoji" or "torii"
+                  or "ember" or "forgewalker" or "phoenix" or "colossus" or "heliostat"
+                  or "sprite" or "wanderer" or "caravan" or "glider" or "oracle"
+                  or "sentinel" or "beacon";
+
+        /// <summary>Sheet layout is uniform across the whole pack: 256x256 cells, 6 columns x
+        /// 4 rows = 24 frames. Only per-motion timing differs (manifest.json's own numbers).</summary>
+        public const int SpriteSheetCols   = 6;
+        public const int SpriteSheetRows   = 4;
+        public const int SpriteSheetFrames = 24;
+
+        /// <summary>Neutral and walk loop over 1.15s; attack plays once over 2.1s and holds
+        /// its last frame rather than looping back to a windup.</summary>
+        public static void SpriteSheetTiming(string motion, out float duration, out bool loop)
+        {
+            if (motion == "attack") { duration = 2.1f; loop = false; }
+            else                    { duration = 1.15f; loop = true; }
+        }
+
+        /// <summary>Loads a sprite-pack sheet (standard variant) from Resources. Cached by the
+        /// Resources system itself; no need to duplicate caching here.</summary>
+        public static Texture2D SpriteSheetTexture(string id, string motion)
+            => Resources.Load<Texture2D>($"TroopSheets/{id}__standard__{motion}");
 
         /// <summary>True when this art id has walk-cycle pose frames (legged walkers).</summary>
         public static bool HasPoses(string id)

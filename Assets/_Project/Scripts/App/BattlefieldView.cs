@@ -31,7 +31,7 @@ namespace NW.App
 
         // Troop size multiplier over the original authored art scale. 3.2 puts a trooper at
         // ~110 units (~44% of a 249-unit lane), where animation polish is actually legible.
-        const float UnitScale = 3.2f;
+        const float UnitScale = 3.8f;   // was 3.2 -- bumped per user request 2026-09-27 so painted troop art reads at battle scale; needs a visual pass to confirm lanes don't crowd
         const float TerritoryStrip = 0.07f;   // captured-ground strip height, fraction of lane
         static readonly Color PlayerTint  = new Color(0.0f, 0.9f, 1f, 0.55f);
         static readonly Color EnemyTint   = new Color(1f, 0.25f, 0.1f, 0.55f);
@@ -44,6 +44,22 @@ namespace NW.App
         BattleSession _session;
         Font _font;
         RectTransform _container;
+
+        // Zoom (2026-09-28): lanes/units/cores/projectiles all parent under this child of
+        // _container instead of _container directly, so scaling it zooms the battlefield's
+        // CONTENT without also scaling _container's own background/border image or moving it
+        // out of the screen region BattleScene allocated it -- that panel needs a RectMask2D
+        // (added where the panel is built) so a zoomed-in view clips instead of overflowing
+        // into the wallet/board panels above and below it.
+        RectTransform _zoomContent;
+        float _zoom = 1f;
+        public const float MinZoom = 0.75f, MaxZoom = 1.5f;
+        public float Zoom => _zoom;
+        public void SetZoom(float z)
+        {
+            _zoom = Mathf.Clamp(z, MinZoom, MaxZoom);
+            if (_zoomContent != null) _zoomContent.localScale = Vector3.one * _zoom;
+        }
 
         readonly RectTransform[] _laneRects      = new RectTransform[CombatSim.LaneCount];
         RectTransform            _fieldOverlay;   // battlefield-space layer for cross-lane projectiles (P0)
@@ -156,6 +172,8 @@ namespace NW.App
             public float         AttackPoseTime; // Time.time when AttackPose last changed -- drives
                                                   // DriveAttackSwing's windup/strike ease, independent
                                                   // of whichever coroutine's own choreography timing set it
+            public string        SpriteMotion;   // sprite-pack: current motion name ("neutral"/"walk"/"attack")
+            public float         SpriteMotionTime; // seconds since SpriteMotion last changed
         }
 
         readonly Dictionary<ulong, UnitView> _views      = new();
@@ -171,6 +189,13 @@ namespace NW.App
             _container = container;
             _font      = font;
             _basePos   = container.anchoredPosition;
+
+            var zoomGo = new GameObject("ZoomContent");
+            zoomGo.transform.SetParent(_container, false);
+            _zoomContent = zoomGo.AddComponent<RectTransform>();
+            _zoomContent.anchorMin = Vector2.zero; _zoomContent.anchorMax = Vector2.one;
+            _zoomContent.offsetMin = _zoomContent.offsetMax = Vector2.zero;
+            _zoomContent.pivot = new Vector2(0.5f, 0.5f);
 
             BuildAirLane();
             for (int lane = 0; lane < CombatSim.GroundLanes; lane++) BuildGroundLane(lane);
@@ -213,12 +238,30 @@ namespace NW.App
 
         void BuildGroundLane(int lane)
         {
-            // Ground lanes split everything under the air lane evenly, derived from
-            // GroundLanes so the band height follows the lane count (3 lanes => ~27% each,
-            // +35% vs the old 4-lane layout — the headroom that lets units be legible).
+            // Ground lanes split everything under the air lane evenly among the lanes this
+            // LEVEL actually opens (CombatSim.ActiveGroundLanes, 2026-09-28 difficulty-by-
+            // lane-count) rather than the physical GroundLanes constant -- an early level
+            // with only 1-2 active lanes gets that much MORE height per lane instead of
+            // rendering equal-height bands where some are simply never used. A dormant lane
+            // still gets a real (if zero-height) rect rather than being skipped entirely,
+            // since every other per-lane system here (pylons, wave-warning, ambient motes)
+            // indexes _laneRects[0..GroundLanes-1] unconditionally and would null-ref on a
+            // lane that was never built at all.
             const float GROUND_TOP = 0.84f;
-            float gh  = GROUND_TOP / CombatSim.GroundLanes;
-            float top = GROUND_TOP - lane * gh;
+            int activeLanes = _session != null ? _session.Combat.ActiveGroundLanes : CombatSim.GroundLanes;
+            float gh, top;
+            if (lane < activeLanes)
+            {
+                gh  = GROUND_TOP / activeLanes;
+                top = GROUND_TOP - lane * gh;
+            }
+            else
+            {
+                // Every dormant lane collapses to the same zero-height seam, exactly where
+                // the active lanes' band ends (y=0 in this normalized, bottom-up layout).
+                gh  = 0f;
+                top = 0f;
+            }
             var rt = MakeLaneRect($"Lane_{lane}", top - gh + 0.005f, top - 0.005f);
             _laneRects[lane] = rt;
             var laneBgImg = rt.GetComponent<Image>();
@@ -342,7 +385,7 @@ namespace NW.App
         void BuildCore(bool isPlayer)
         {
             var go = new GameObject(isPlayer ? "NexusCore" : "EnemyCore");
-            go.transform.SetParent(_container, false);
+            go.transform.SetParent(_zoomContent, false);
             var rt = go.AddComponent<RectTransform>();
             float xMin = isPlayer ? 0f : 1f;
             rt.anchorMin = new Vector2(xMin, 0f); rt.anchorMax = new Vector2(xMin, 0.83f);
@@ -956,6 +999,17 @@ namespace NW.App
                 if (isAir)
                 {
                     bob = Mathf.Sin(v.BobPhase) * 2.0f; // smooth hover — air never fully settles
+
+                    // Sprite-pack air units (Drone/Probe, Interceptor/Talon, and every other
+                    // theme's equivalents) were falling through to the rotor-blur pose swapper
+                    // below untouched -- that branch only exists for the OLD procedural path, so
+                    // Talon/Probe kept showing the baked texture even with the art pack on. Air
+                    // units don't have a walk-weight concept (they're always "flying"), so the
+                    // flight/hover motion IS their idle state; only an attack interrupts it.
+                    if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(v.ArtId))
+                    {
+                        DriveSpriteSheet(v, 1f);
+                    }
                     // Rotor blur. Air units never ran the pose swapper, so a quadrotor slid
                     // through the sky with frozen blades. Cycle its frames on a fast clock
                     // that is independent of the hover bob.
@@ -965,7 +1019,7 @@ namespace NW.App
                     // given frame. That's the actual cause of "still beating its wings, fins
                     // not visible": the two systems were flickering the texture back and
                     // forth, never settling on the rig's own body-without-blades texture.
-                    if (NeonArt.HasPoses(v.ArtId) && v.AttackPose < 0 && !v.RotorRigged)
+                    else if (NeonArt.HasPoses(v.ArtId) && v.AttackPose < 0 && !v.RotorRigged)
                     {
                         // 26Hz was authored for a quadrotor whose two frames differ only by a
                         // rotor smear -- at that rate it reads as blur. The authored flyers
@@ -988,6 +1042,12 @@ namespace NW.App
                 else if (v.IsStationary)
                 {
                     bob = 0f;
+                    // Turrets (every theme) never walk, but they DO attack -- and this branch
+                    // is the only place their texture is driven at all, so without this they'd
+                    // never show the sprite pack's attack motion either, only ever the single
+                    // spawn-time neutral frame set in RefreshUnits.
+                    if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(v.ArtId))
+                        DriveSpriteSheet(v, 0f);
                 }
                 else
                 {
@@ -1025,7 +1085,11 @@ namespace NW.App
 
                     // Iteration 3: 2-frame walk cycle — legs alternate stride/pass each
                     // half-step; units plant into the neutral stance when settled OR stopped.
-                    if (NeonArt.HasPoses(v.ArtId))
+                    if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(v.ArtId))
+                    {
+                        DriveSpriteSheet(v, walkW);
+                    }
+                    else if (NeonArt.HasPoses(v.ArtId))
                     {
                         // An attack pose owns the body while it is set; otherwise the gait drives it.
                         // Four-beat walk. The old test picked between two frames on the SIGN
@@ -1574,7 +1638,15 @@ namespace NW.App
             }
             else
             {
-                v.Body.texture   = NeonArt.Unit(artId, isPlayer);
+                // Stationary units (turrets, every theme) never get a per-frame texture
+                // update below -- their branch in the main loop only zeroes bob, since they
+                // never walk -- so this spawn-time assignment is the ONLY place their
+                // texture is ever set. Every other unit's per-frame Update overwrites this
+                // on its first tick regardless, but checking the sprite pack here too avoids
+                // even that one-frame flash of the old procedural art.
+                v.Body.texture = GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(artId)
+                    ? NeonArt.SpriteSheetTexture(artId, "neutral")
+                    : NeonArt.Unit(artId, isPlayer);
                 v.Weapon.enabled = false;
             }
 
@@ -1603,18 +1675,7 @@ namespace NW.App
                     var rt2 = img.rectTransform;
                     // reparent shins onto their thigh so the knee composes with the hip
                     var parent = info.Parent >= 0 ? v.Limbs[info.Parent].rectTransform : v.Rt;
-                    rt2.SetParent(parent, false);
-                    rt2.sizeDelta = v.Rt.sizeDelta;
-                    rt2.pivot     = info.Joint;
-                    // a child's rect must sit exactly on top of the body rect: shifting by
-                    // (pivot - centre) puts the full canvas back in register after the pivot move
-                    rt2.anchorMin = rt2.anchorMax = new Vector2(0.5f, 0.5f);
-                    rt2.anchoredPosition = info.Parent >= 0
-                        ? new Vector2((info.Joint.x - NeonArt.LimbInfo(artId, info.Parent).Joint.x) * v.Rt.sizeDelta.x,
-                                      (info.Joint.y - NeonArt.LimbInfo(artId, info.Parent).Joint.y) * v.Rt.sizeDelta.y)
-                        : new Vector2((info.Joint.x - 0.5f) * v.Rt.sizeDelta.x,
-                                      (info.Joint.y - 0.5f) * v.Rt.sizeDelta.y);
-                    rt2.localRotation = Quaternion.identity;
+                    LimbRigView.ConfigureSegment(rt2, parent, v.Rt.rect.size, info.Joint, !isPlayer);
                     img.texture = NeonArt.UnitLimb(artId, isPlayer, li);
                     img.uvRect  = uv;
                     img.color   = v.Body.color;
@@ -1654,13 +1715,7 @@ namespace NW.App
                     }
                     var img = v.MultiLegs[li];
                     var rt2 = img.rectTransform;
-                    rt2.SetParent(v.Rt, false);
-                    rt2.sizeDelta = v.Rt.sizeDelta;
-                    rt2.pivot     = joint;
-                    rt2.anchorMin = rt2.anchorMax = new Vector2(0.5f, 0.5f);
-                    rt2.anchoredPosition = new Vector2((joint.x - 0.5f) * v.Rt.sizeDelta.x,
-                                                        (joint.y - 0.5f) * v.Rt.sizeDelta.y);
-                    rt2.localRotation = Quaternion.identity;
+                    LimbRigView.ConfigureSegment(rt2, v.Rt, v.Rt.rect.size, joint, !isPlayer);
                     img.texture = NeonArt.UnitMultiLeg(artId, isPlayer, li);
                     img.uvRect  = uv;
                     img.color   = v.Body.color;
@@ -1696,12 +1751,8 @@ namespace NW.App
                     }
                     var rimg = v.Rotors[side];
                     var rrt  = rimg.rectTransform;
-                    rrt.sizeDelta = v.Rt.sizeDelta;
-                    Vector2 hub = NeonArt.RotorHub01(side);
-                    rrt.pivot = hub;
-                    rrt.anchoredPosition = new Vector2((hub.x - 0.5f) * v.Rt.sizeDelta.x,
-                                                        (hub.y - 0.5f) * v.Rt.sizeDelta.y);
-                    rrt.localRotation = Quaternion.identity;
+                    LimbRigView.ConfigureSegment(rrt, v.Rt, v.Rt.rect.size,
+                        NeonArt.RotorHub01(side), !isPlayer);
                     rimg.texture = NeonArt.UnitRotor(artId, isPlayer, side);
                     rimg.uvRect  = uv;
                     rimg.color   = v.Body.color;
@@ -1859,6 +1910,20 @@ namespace NW.App
         /// passes); 6 and 7 are the same two beats with the far foot leading. Numbered this
         /// way so 3/4/5 keep meaning windup / strike / flinch.</summary>
         static readonly int[] Walk4 = { 1, 2, 6, 7 };
+
+        /// <summary>Sprite-pack path: plays the unit's painted flipbook sheet instead of the
+        /// procedural rig/pose system. No live limb rig runs for these units -- v.Limbs (if
+        /// built, since most sprite-pack ids also satisfy HasLimbRig) simply stays in its
+        /// initial disabled state because DriveLimbRig is never called from this branch.</summary>
+        void DriveSpriteSheet(UnitView v, float walkW)
+        {
+            string motion = (v.AttackPose == 3 || v.AttackPose == 4) ? "attack"
+                          : walkW > 0.4f ? "walk"
+                          : "neutral";
+            if (motion != v.SpriteMotion) { v.SpriteMotion = motion; v.SpriteMotionTime = 0f; }
+            v.SpriteMotionTime += Time.deltaTime;
+            SpriteSheetView.SetFrame(v.Body, v.ArtId, motion, v.SpriteMotionTime, !v.IsPlayer);
+        }
 
         /// <summary>Rotates the limb layers from a continuous walk phase. The angles are the
         /// same curves the baked poses sampled -- a hip swing, a knee that folds only on the
@@ -2730,7 +2795,7 @@ namespace NW.App
         void BuildFieldOverlay()
         {
             var go = new GameObject("ProjectileOverlay");
-            go.transform.SetParent(_container, false);
+            go.transform.SetParent(_zoomContent, false);
             var rt = go.AddComponent<RectTransform>();
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.pivot     = new Vector2(0.5f, 0.5f);
@@ -2881,7 +2946,7 @@ namespace NW.App
             if (anchorImg == null || _container == null) return;
 
             var go = new GameObject("coreDmg");
-            go.transform.SetParent(_container, false);
+            go.transform.SetParent(_zoomContent, false);
             var rt = go.AddComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(ownCore ? 0f : 1f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
@@ -3799,7 +3864,7 @@ namespace NW.App
         RectTransform MakeLaneRect(string name, float yMin, float yMax)
         {
             var go = new GameObject(name);
-            go.transform.SetParent(_container, false);
+            go.transform.SetParent(_zoomContent, false);
             var rt = go.AddComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, yMin); rt.anchorMax = new Vector2(1f, yMax);
             rt.offsetMin = new Vector2(CORE_W + 2, 0);

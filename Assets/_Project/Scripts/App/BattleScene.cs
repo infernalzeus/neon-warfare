@@ -431,6 +431,11 @@ namespace NW.App
             bfRt.offsetMin = new Vector2(0, BOARD_H + STRIP_H + 2);
             bfRt.offsetMax = new Vector2(0, -TOP_H - WALLET_H - 2); // portrait: clear the top wallet strip
             bfGo.AddComponent<Image>().color = new Color(theme.BgPanel.r, theme.BgPanel.g, theme.BgPanel.b, 0.42f);
+            // Zoom (2026-09-28) scales BattlefieldView's inner content, not this panel -- but
+            // zoomed-in content can still extend past this panel's own edges, so it needs a
+            // mask to clip against the wallet/board panels above and below rather than paint
+            // over them.
+            bfGo.AddComponent<RectMask2D>();
 
             // Themed accent border around the battlefield
             AddThemeBorder(bfGo.transform, theme.Accent);
@@ -503,6 +508,45 @@ namespace NW.App
             }
         }
 
+        /// <summary>Two small +/- buttons under the MENU gear, scaling BattlefieldView's
+        /// zoomed content in fixed steps (2026-09-28). Deliberately outside the MENU modal --
+        /// zoom is something you reach for mid-battle, not a settings-panel toggle.</summary>
+        private void BuildZoomControl(NeonTheme.Theme theme)
+        {
+            var zoomGo = new GameObject("ZoomControl");
+            zoomGo.transform.SetParent(_canvasGo.transform, false);
+            var zRt = zoomGo.AddComponent<RectTransform>();
+            zRt.anchorMin = zRt.anchorMax = new Vector2(1, 1);
+            zRt.pivot = new Vector2(1, 1);
+            zRt.anchoredPosition = new Vector2(-12, -(TOP_H + WALLET_H + 8 + 110 + 8));
+            zRt.sizeDelta = new Vector2(120, 52);
+
+            void ZoomBtn(float xNorm, string label, float delta)
+            {
+                var go = new GameObject("zoom" + label);
+                go.transform.SetParent(zoomGo.transform, false);
+                var rt = go.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(xNorm, 0f); rt.anchorMax = new Vector2(xNorm + 0.5f, 1f);
+                rt.offsetMin = new Vector2(xNorm == 0f ? 0f : 3f, 0f);
+                rt.offsetMax = new Vector2(xNorm == 0f ? -3f : 0f, 0f);
+                var img = go.AddComponent<Image>();
+                img.color = new Color(theme.BgCard.r, theme.BgCard.g, theme.BgCard.b, 1f);
+                var txtGo = new GameObject("txt"); txtGo.transform.SetParent(go.transform, false);
+                var txtRt = txtGo.AddComponent<RectTransform>();
+                txtRt.anchorMin = Vector2.zero; txtRt.anchorMax = Vector2.one;
+                txtRt.offsetMin = txtRt.offsetMax = Vector2.zero;
+                var txt = txtGo.AddComponent<Text>();
+                txt.font = _font; txt.fontSize = 28; txt.fontStyle = FontStyle.Bold;
+                txt.color = theme.TextBright; txt.alignment = TextAnchor.MiddleCenter;
+                txt.text = label; txt.supportRichText = false; txt.raycastTarget = false;
+                var btn = go.AddComponent<Button>();
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(() => _bfView.SetZoom(_bfView.Zoom + delta));
+            }
+            ZoomBtn(0f,   "-", -0.1f);
+            ZoomBtn(0.5f, "+",  0.1f);
+        }
+
         private void BuildIngameControls()
         {
             var theme = NeonTheme.Active;
@@ -544,6 +588,8 @@ namespace NW.App
                 _controlsPanel.SetActive(open);
                 if (open) _controlsPanel.transform.SetAsLastSibling();
             });
+
+            BuildZoomControl(theme);
 
             _controlsPanel = new GameObject("IngameControls");
             _controlsPanel.transform.SetParent(_canvasGo.transform, false);

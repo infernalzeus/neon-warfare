@@ -789,7 +789,16 @@ namespace NW.App
                 var row = Mk(card.transform, $"conv{i}", new Vector2(0.05f, y0), new Vector2(0.95f, y1));
                 row.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.30f);
 
-                var icoGo = Mk(row.transform, "ic", new Vector2(0.02f, 0.15f), new Vector2(0.12f, 0.85f));
+                // Stretched anchors (0.02-0.12 x, 0.15-0.85 y) sized this to whatever the row's
+                // own aspect happened to be, which was harmless for the old procedural gems
+                // (drawn to fill their texture edge-to-edge anyway) but visibly squashes the
+                // new painted gems, which have real transparent margin around a centred shape.
+                // A point anchor + fixed square sizeDelta keeps it square regardless of row size.
+                var icoGo = new GameObject("ic"); icoGo.transform.SetParent(row.transform, false);
+                var icoRt = icoGo.AddComponent<RectTransform>();
+                icoRt.anchorMin = icoRt.anchorMax = new Vector2(0.02f, 0.5f);
+                icoRt.pivot = new Vector2(0f, 0.5f);
+                icoRt.sizeDelta = new Vector2(UIScale.IconGemHUD, UIScale.IconGemHUD);
                 var ico = icoGo.AddComponent<RawImage>();
                 ico.texture = NeonArt.Gem(gi, NeonTheme.Active.GemStyle);
                 ico.raycastTarget = false;

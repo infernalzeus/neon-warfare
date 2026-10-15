@@ -429,7 +429,7 @@ namespace NW.App
                         val.color = GemColor[k];
                         val.alignment = TextAnchor.MiddleCenter;
                         val.resizeTextForBestFit = true;
-                        val.resizeTextMinSize = 10; val.resizeTextMaxSize = UIScale.FontBody;
+                        val.resizeTextMinSize = 12; val.resizeTextMaxSize = UIScale.FontBody; // was 10 -- Codex UI audit floor concern
                         val.text = currency[k].ToString();
                         val.raycastTarget = false;
                     }
@@ -446,10 +446,14 @@ namespace NW.App
                 "PLAY", CyanPrimary, new Color(0f, 0.18f, 0.28f),
                 () => SelectSlot(slot));
 
-            // WIPE button (danger, small) — 0.03 gap above JACK IN bottom
+            // WIPE button (danger, small) — sized/colored down from an earlier pass that gave it
+            // nearly PLAY's own footprint (64% width x 12% height, fully saturated red), which
+            // the Codex UI audit flagged as excessive prominence for a destructive action that
+            // already has its own confirmation modal. PLAY stays the clear focal action; DELETE
+            // is a quiet secondary one, not a second primary button.
             BuildButton(_font, card, "Wipe",
-                new Vector2(0.18f, 0.045f), new Vector2(0.82f, 0.165f),
-                "DELETE", new Color(0.9f, 0.25f, 0.2f), new Color(0.18f, 0.04f, 0.04f),
+                new Vector2(0.30f, 0.055f), new Vector2(0.70f, 0.145f),
+                "DELETE", new Color(0.62f, 0.28f, 0.26f), new Color(0.14f, 0.05f, 0.05f),
                 () => ConfirmWipe(slot));
         }
 

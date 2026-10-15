@@ -98,7 +98,8 @@ namespace NW.App
             }
 
             float coreHp = LevelConfig.CoreHp(level);
-            Combat = new CombatSim(coreHp, coreHp, director, new Rng(seed + 1));
+            Combat = new CombatSim(coreHp, coreHp, director, new Rng(seed + 1),
+                LevelConfig.ActiveGroundLanes(level));
             Resources[(int)GemKind.Energy] = 15;
             Resources[(int)GemKind.Plasma] = 8;
             Resources[(int)GemKind.Nano]   = 8;

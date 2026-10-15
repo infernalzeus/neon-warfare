@@ -56,9 +56,33 @@ namespace NW.App
             }
         }
 
+        string _spriteMotion = "";
+        float  _spriteClock;
+
         void Update()
         {
             if (Target == null || string.IsNullOrEmpty(ArtId)) return;
+
+            // Sprite-pack units skip the whole procedural pose/rig cycle below and just loop
+            // neutral -> walk -> attack -> neutral on their own painted flipbook, matching
+            // BattlefieldView.DriveSpriteSheet's motion selection.
+            if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(ArtId))
+            {
+                float walkSpanS = IsStationary ? 0f : WalkSpan;
+                float cycleS = walkSpanS + AttackSpan + IdleSpan;
+                _clock += Time.unscaledDeltaTime;
+                float ts = _clock % cycleS;
+                string motion = ts < walkSpanS ? "walk"
+                              : ts < walkSpanS + AttackSpan ? "attack"
+                              : "neutral";
+                if (motion != _spriteMotion) { _spriteMotion = motion; _spriteClock = 0f; }
+                _spriteClock += Time.unscaledDeltaTime;
+                SpriteSheetView.SetFrame(Target, ArtId, motion, _spriteClock, mirror: !IsPlayer);
+                _rt.anchoredPosition = _basePos;
+                _rt.localRotation    = Quaternion.identity;
+                return;
+            }
+
             if (!NeonArt.HasPoses(ArtId)) return;      // static art: leave the still frame alone
 
             // A stationary unit never marches, so skip the walk phase entirely rather than

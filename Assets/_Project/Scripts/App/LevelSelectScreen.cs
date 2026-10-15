@@ -1101,11 +1101,23 @@ namespace NW.App
             // Hero stage: the animated troop is the point of this screen, so it leads at a size
             // where the walk and the attack actually read, instead of a thumbnail above a wall
             // of stats with the animation buried in a separate box further down.
-            iconRt.sizeDelta = new Vector2(150f, 150f);
+            iconRt.sizeDelta = new Vector2(175f, 175f);   // was 150 -- bumped per user request 2026-09-27
             var iconImg = iconGo.AddComponent<RawImage>();
             string heroArt = ThemeLocale.ArtId(troopId);
-            iconImg.texture = NeonArt.Unit(heroArt, true);
-            iconImg.color = t.Accent;
+            // Same bug class fixed elsewhere this session (deploy cards, turrets): sprite-pack
+            // art needs its own initial frame (not a one-frame flash of the old procedural
+            // texture before TroopPoseAnimator's next Update) and the light 22% tint instead of
+            // a full accent-color multiply, which would wash out the painted art.
+            if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(heroArt))
+            {
+                SpriteSheetView.SetFrame(iconImg, heroArt, "neutral", 0f, mirror: false);
+                iconImg.color = Color.Lerp(Color.white, t.Accent, 0.22f);
+            }
+            else
+            {
+                iconImg.texture = NeonArt.Unit(heroArt, true);
+                iconImg.color = t.Accent;
+            }
             var heroAnim   = iconGo.AddComponent<TroopPoseAnimator>();
             heroAnim.Target   = iconImg;
             heroAnim.ArtId    = heroArt;
@@ -1402,7 +1414,9 @@ namespace NW.App
             sprRtOut = slotRt;                                            // the LANE mover
             string demoArtId = ThemeLocale.ArtId(troopId);
             var sprImg = sprGo.AddComponent<RawImage>();
-            sprImg.texture = NeonArt.Unit(demoArtId, isPlayer);
+            sprImg.texture = GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(demoArtId)
+                ? NeonArt.SpriteSheetTexture(demoArtId, "neutral")
+                : NeonArt.Unit(demoArtId, isPlayer);
             // "Livery lives in the art now" holds for themes whose signature colour is part of
             // the authored sprite (a cape, heraldry). Cyber's glow accents are fixed theme
             // constants, not per-team livery, so an enemy Cyber unit baked no differently than
@@ -1456,7 +1470,7 @@ namespace NW.App
             flashImg = flashRaw;
         }
 
-        const float DemoUnitPx = 118f;   // battlefield proportion, not a thumbnail
+        const float DemoUnitPx = 140f;   // battlefield proportion, not a thumbnail (was 118 -- bumped per user request 2026-09-27)
 
         /// <summary>Lane furniture: cores at each end, floor, captured strips, pylon node.</summary>
         void BuildDemoLane(Transform parent, NeonTheme.Theme t)
@@ -1731,6 +1745,38 @@ namespace NW.App
                 float gaitL = 0f, gaitR = 0f, hoverL = 0f, hoverR = 0f;
                 bool ended = false;
 
+                // Sprite-pack units get their painted flipbook here too, instead of the
+                // procedural rig/pose swap below -- same UsesSpriteSheet gate BattlefieldView
+                // uses. Attack/flinch/loose (DemoStrike/DemoFlinch/DemoLoose below) are left on
+                // the existing procedural pose textures for this pass -- they're short,
+                // discretely-timed coroutines, not a continuously-driven clock like this loop,
+                // and rewiring their timing is out of scope here; only neutral/walk are covered.
+                bool lSpritePack = GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(lArt);
+                bool rSpritePack = GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(rArt);
+                float spriteClockL = 0f, spriteClockR = 0f;
+                string spriteMotionL = "", spriteMotionR = "";
+                void DriveDemoSprite(bool left, bool walking)
+                {
+                    RawImage img = left ? leftSprImg : rightSprImg;
+                    RawImage flash = left ? leftFlashImg : rightFlashImg;
+                    string art = left ? lArt : rArt;
+                    string motion = walking ? "walk" : "neutral";
+                    string prevMotion = left ? spriteMotionL : spriteMotionR;
+                    float clock = (left ? spriteClockL : spriteClockR) + Time.deltaTime;
+                    if (motion != prevMotion) clock = 0f;
+                    if (left) { spriteMotionL = motion; spriteClockL = clock; }
+                    else      { spriteMotionR = motion; spriteClockR = clock; }
+                    if (img != null)
+                    {
+                        // Never mirror via uvRect here: MakeDemoSlot already flips the enemy's
+                        // whole "spr" child with localScale.x=-1, so mirroring the UV too would
+                        // cancel back out to the player's handedness (the same "moonwalking
+                        // enemy" class of bug DemoPose's rig call already has a comment about).
+                        SpriteSheetView.SetFrame(img, art, motion, clock, mirror: false);
+                        if (flash != null) { flash.texture = img.texture; flash.uvRect = img.uvRect; }
+                    }
+                }
+
                 while (!ended)
                 {
                     if (leftSpr == null || rightSpr == null) yield break;
@@ -1811,7 +1857,12 @@ namespace NW.App
                         gaitL += dt * 8f;
                         float bobL = lAir ? Mathf.Sin(gaitL * 0.6f) * 4f : Mathf.Abs(Mathf.Sin(gaitL)) * 3f;
                         DemoPlace(leftSpr, nxL, lGround, bobL);
-                        if (leftLimbs != null)
+                        if (lSpritePack)
+                        {
+                            if (leftLimbs != null) LimbRigView.SetEnabled(leftLimbs, false, Color.white);
+                            DriveDemoSprite(true, walking: true);
+                        }
+                        else if (leftLimbs != null)
                         {
                             LimbRigView.SetEnabled(leftLimbs, true, leftSprImg != null ? leftSprImg.color : Color.white);
                             var noLimbsTex = NeonArt.UnitNoLimbs(lArt, true);
@@ -1825,7 +1876,8 @@ namespace NW.App
                     else
                     {
                         if (leftLimbs != null) LimbRigView.SetEnabled(leftLimbs, false, Color.white);
-                        if (wasWalkingL && leftRotors == null) DemoPose(leftSpr, lArt, 0, true); // settle once, hand off to hit anims
+                        if (lSpritePack) DriveDemoSprite(true, walking: false);
+                        else if (wasWalkingL && leftRotors == null) DemoPose(leftSpr, lArt, 0, true); // settle once, hand off to hit anims
                         float lift = 0f;
                         if (lAir) { hoverL += dt; lift = Mathf.Sin(hoverL * 3.2f) * 4f; } // fliers never stand still
                         DemoPlace(leftSpr, nxL, lGround, lift);
@@ -1837,7 +1889,12 @@ namespace NW.App
                         gaitR += dt * 8f;
                         float bobR = rAir ? Mathf.Sin(gaitR * 0.6f + 1f) * 4f : Mathf.Abs(Mathf.Sin(gaitR + Mathf.PI)) * 3f;
                         DemoPlace(rightSpr, nxR, rGround, bobR);
-                        if (rightLimbs != null)
+                        if (rSpritePack)
+                        {
+                            if (rightLimbs != null) LimbRigView.SetEnabled(rightLimbs, false, Color.white);
+                            DriveDemoSprite(false, walking: true);
+                        }
+                        else if (rightLimbs != null)
                         {
                             LimbRigView.SetEnabled(rightLimbs, true, rightSprImg != null ? rightSprImg.color : Color.white);
                             var noLimbsTex = NeonArt.UnitNoLimbs(rArt, false);
@@ -1859,7 +1916,8 @@ namespace NW.App
                     else
                     {
                         if (rightLimbs != null) LimbRigView.SetEnabled(rightLimbs, false, Color.white);
-                        if (wasWalkingR && rightRotors == null) DemoPose(rightSpr, rArt, 0, false);
+                        if (rSpritePack) DriveDemoSprite(false, walking: false);
+                        else if (wasWalkingR && rightRotors == null) DemoPose(rightSpr, rArt, 0, false);
                         float lift = 0f;
                         if (rAir) { hoverR += dt; lift = Mathf.Sin(hoverR * 3.2f + 1.4f) * 4f; }
                         DemoPlace(rightSpr, nxR, rGround, lift);
@@ -2202,7 +2260,13 @@ namespace NW.App
                     string aid = ThemeLocale.ArtId(troops[i]);
                     try
                     {
-                        _troopIcons[i].texture = NeonArt.Unit(aid, true);
+                        if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(aid))
+                            SpriteSheetView.SetFrame(_troopIcons[i], aid, "neutral", 0f, mirror: false);
+                        else
+                        {
+                            _troopIcons[i].uvRect  = new Rect(0f, 0f, 1f, 1f);
+                            _troopIcons[i].texture = NeonArt.Unit(aid, true);
+                        }
                         _troopNames[i].text = ThemeLocale.TroopName(troops[i]).Replace(" ", "\n");
                     }
                     catch (System.Exception e)

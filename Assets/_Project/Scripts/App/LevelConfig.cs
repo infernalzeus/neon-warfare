@@ -78,6 +78,20 @@ namespace NW.App
         /// </summary>
         public static float CoreHp(int level) => 220f + (level - 1) * 52f;
 
+        /// <summary>How many of CombatSim.GroundLanes are open this level (2026-09-28,
+        /// difficulty-by-lane-count). Same tier boundaries as LevelName below: TRAINING opens
+        /// one lane so a first match reads as simple and each troop gets more screen room;
+        /// SKIRMISH opens a second; CAMPAIGN onward runs the full lane count. Passed straight
+        /// into CombatSim's constructor -- see ActiveGroundLanes there for what actually reads
+        /// this (spawn-lane selection, the director's wave targeting, SURGE's majority
+        /// threshold).</summary>
+        public static int ActiveGroundLanes(int level)
+        {
+            if (level <= 3) return 1;
+            if (level <= 7) return 2;
+            return NW.Combat.Domain.CombatSim.GroundLanes;
+        }
+
         /// <summary>Tokens rewarded per game on this level (base; multiplied by score).</summary>
         public static int BaseTokenReward(int level) => 15 + level * 7;
 

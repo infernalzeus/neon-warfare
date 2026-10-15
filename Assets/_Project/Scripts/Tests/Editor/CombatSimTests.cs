@@ -120,5 +120,77 @@ namespace NW.Tests
             }
             Assert.AreEqual(Play(99), Play(99), "fixed seed â‡’ identical battle");
         }
+
+        // ── ActiveGroundLanes (2026-09-28, difficulty-by-lane-count) ────────────
+
+        [Test]
+        public void ActiveGroundLanes_DefaultsToFullGroundLanes()
+        {
+            CombatSim sim = NewSim();
+            Assert.AreEqual(CombatSim.GroundLanes, sim.ActiveGroundLanes,
+                "omitting the parameter must reproduce every pre-existing test's behaviour exactly");
+        }
+
+        [Test]
+        public void ActiveGroundLanes_ClampsOutOfRangeConstructorArgs()
+        {
+            var lowSim  = new CombatSim(500, 500, new DirectorConfig(), new Rng(1), activeGroundLanes: 0);
+            var highSim = new CombatSim(500, 500, new DirectorConfig(), new Rng(1), activeGroundLanes: 99);
+            Assert.AreEqual(1, lowSim.ActiveGroundLanes, "at least one lane must always be open");
+            Assert.AreEqual(CombatSim.GroundLanes, highSim.ActiveGroundLanes, "cannot exceed the physical lane count");
+        }
+
+        [Test]
+        public void ActiveGroundLanes_RandomSpawnNeverPicksADormantLane()
+        {
+            var sim = new CombatSim(500, 500, new DirectorConfig(), new Rng(7), activeGroundLanes: 1);
+            for (int i = 0; i < 25; i++)
+            {
+                int idx = sim.Spawn(Melee(), i % 2 == 0 ? Team.Player : Team.Enemy, lane: -1);
+                Assert.AreEqual(0, sim.Units[idx].Lane, "with 1 active lane, a random pick must always land on lane 0");
+            }
+        }
+
+        [Test]
+        public void ActiveGroundLanes_ExplicitDormantLaneChoice_FallsBackToActiveLane()
+        {
+            // Requesting lane 2 when only 1 lane is open must not silently spawn a unit
+            // somewhere the level hasn't unlocked -- it should fall back exactly like an
+            // unspecified (-1) choice does.
+            var sim = new CombatSim(500, 500, new DirectorConfig(), new Rng(3), activeGroundLanes: 1);
+            int idx = sim.Spawn(Melee(), Team.Player, lane: 2);
+            Assert.AreEqual(0, sim.Units[idx].Lane);
+        }
+
+        [Test]
+        public void ActiveGroundLanes_SurgeMajorityScalesDownWithFewerLanes()
+        {
+            // A hardcoded ">= 2" threshold (the original 3-lane balance) would make SURGE
+            // unreachable on a 1-lane level, since nobody can ever control 2 of 1. The
+            // majority must scale: 1 lane needs 1 (all of it) to trigger.
+            var sim = new CombatSim(500, 500, new DirectorConfig(), new Rng(5), activeGroundLanes: 1);
+            var runner = Melee(hp: 500, dmg: 0);
+            runner.SpawnAtPylon = false;
+            int idx = sim.Spawn(runner, Team.Player, lane: 0);
+            for (int i = 0; i < 4000 && sim.Units[idx].Alive; i++)
+            {
+                sim.Tick();
+                if (sim.SurgeOwner == Owner.Player) break;
+            }
+            Assert.AreEqual(Owner.Player, sim.SurgeOwner,
+                "controlling the single active lane's pylons must trigger SURGE on a 1-lane level");
+        }
+
+        [Test]
+        public void ActiveGroundLanes_DirectorNeverTelegraphsADormantLane()
+        {
+            var director = new DirectorConfig { BaseBudgetPerSecond = 40f, DifficultyMult = 1f, WaveThreshold = 5f };
+            director.SpawnTable.Add((Melee(hp: 10), 1f));
+            var sim = new CombatSim(500, 500, director, new Rng(13), activeGroundLanes: 1);
+            Run(sim, 8f);
+            foreach (CombatEvent e in sim.Events)
+                if (e.Type == CombatEventType.WaveTelegraph || e.Type == CombatEventType.WaveSpawned)
+                    Assert.AreEqual(0, e.Target, "the director must only ever target the one active lane");
+        }
     }
 }

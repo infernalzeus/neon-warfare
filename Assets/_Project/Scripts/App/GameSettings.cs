@@ -20,6 +20,28 @@ namespace NW.App
             set { PlayerPrefs.SetInt("gs_theme", Mathf.Clamp(value, 0, NeonTheme.Count - 1)); PlayerPrefs.Save(); }
         }
 
+        // ── troop art pipeline ─────────────────────────────────────────────────
+        // Kill switch for the painted sprite-pack flipbook art (NeonArt.UsesSpriteSheet):
+        // on by default now that it's reviewed and wired in, but a one-line way to fall
+        // back to 100% procedural art if something reads wrong at real battle scale
+        // rather than a hero-icon preview, without touching the per-id coverage list.
+        public static bool UseSpritePackArt
+        {
+            get => PlayerPrefs.GetInt("gs_use_spritepack", 1) != 0;
+            set { PlayerPrefs.SetInt("gs_use_spritepack", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
+        // Separate switch from UseSpritePackArt (troops) so either art pack can be turned
+        // off without touching the other. Note: the painted gem art is one static image
+        // per gem kind, so it does not vary with BuildGem's "style" parameter -- the
+        // BOARD DISPLAY cosmetic (CLASSIC/CRYSTAL/PIXEL/GLITCH) stops visually differentiating
+        // gems while this is on, since all styles resolve to the same painted image.
+        public static bool UseGemArtPack
+        {
+            get => PlayerPrefs.GetInt("gs_use_gempack", 1) != 0;
+            set { PlayerPrefs.SetInt("gs_use_gempack", value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         // ── cosmetics ───────────────────────────────────────────────────────────
 
         public static int ActiveVfxSkin

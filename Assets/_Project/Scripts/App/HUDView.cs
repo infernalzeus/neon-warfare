@@ -325,8 +325,23 @@ namespace NW.App
                 iconRt.anchoredPosition = Vector2.zero;
                 iconRt.sizeDelta = new Vector2(UIScale.IconUnitCard, UIScale.IconUnitCard);
                 var iconImg = iconGo.AddComponent<RawImage>();
-                iconImg.texture  = NeonArt.Unit(ThemeLocale.ArtId(spec.Id), true);
-                iconImg.color    = NeonCosmetics.GetTroopTint();
+                string cardArtId = ThemeLocale.ArtId(spec.Id);
+                Color cardTint = NeonCosmetics.GetTroopTint();
+                if (GameSettings.UseSpritePackArt && NeonArt.UsesSpriteSheet(cardArtId))
+                {
+                    // Deploy-card icon was never sprite-pack-aware at all -- every card kept
+                    // showing the old procedural texture regardless of the toggle. Same light
+                    // 22% tint lerp BattlefieldView already uses for authored/painted art
+                    // instead of a full multiply, which would wash the painted art out.
+                    SpriteSheetView.SetFrame(iconImg, cardArtId, "neutral", 0f, mirror: false);
+                    cardTint = Color.Lerp(Color.white, cardTint, 0.22f);
+                }
+                else
+                {
+                    iconImg.uvRect  = new Rect(0f, 0f, 1f, 1f);
+                    iconImg.texture = NeonArt.Unit(cardArtId, true);
+                }
+                iconImg.color = cardTint;
                 iconImg.raycastTarget = false;
 
                 // Name — themed display name (PIGEON, KNIGHT etc. for medieval theme)
@@ -340,7 +355,7 @@ namespace NW.App
                 nameLbl.horizontalOverflow = HorizontalWrapMode.Wrap;
                 nameLbl.verticalOverflow   = VerticalWrapMode.Truncate;
                 nameLbl.resizeTextForBestFit = true;
-                nameLbl.resizeTextMinSize = 12;
+                nameLbl.resizeTextMinSize = 13; // was 12 -- Codex UI audit flagged the floor as risky for long themed names
                 nameLbl.resizeTextMaxSize = UIScale.FontH2;
 
                 // Stats
@@ -411,7 +426,7 @@ namespace NW.App
                 iRt.anchorMin = iRt.anchorMax = new Vector2(x0 + slotW * 0.22f, 0.5f);
                 iRt.pivot     = new Vector2(0.5f, 0.5f);
                 iRt.anchoredPosition = Vector2.zero;
-                iRt.sizeDelta = new Vector2(13f, 13f); // cost row is ~15px tall — keep icon smaller than FontH2 (22)
+                iRt.sizeDelta = new Vector2(UIScale.IconGemCost, UIScale.IconGemCost);
                 var iImg = iGo.AddComponent<RawImage>();
                 iImg.texture = NeonArt.Gem(i, NeonTheme.Active.GemStyle); iImg.color = Color.white; iImg.raycastTarget = false;
 
@@ -422,7 +437,7 @@ namespace NW.App
                 nRt.anchorMax = new Vector2(x1 - 0.02f, 1f);
                 nRt.offsetMin = nRt.offsetMax = Vector2.zero;
                 var nTxt = nGo.AddComponent<Text>();
-                nTxt.font = _font; nTxt.fontSize = UIScale.FontTiny; nTxt.fontStyle = FontStyle.Bold;
+                nTxt.font = _font; nTxt.fontSize = UIScale.FontSmall; nTxt.fontStyle = FontStyle.Bold;
                 nTxt.color = gc; nTxt.alignment = TextAnchor.MiddleLeft;
                 nTxt.text = cost[i].ToString(); nTxt.supportRichText = false; nTxt.raycastTarget = false;
                 if (firstLabel == null) firstLabel = nTxt;
