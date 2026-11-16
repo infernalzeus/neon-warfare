@@ -1,0 +1,6 @@
+{"name":"rejects_bad_swaps","note":"out of bounds, non-adjacent, same cell, diagonal, no-match","cols":5,"rows":5,"rngSeed":2,"allowedGemCount":3,"constructed":"new BoardModel(cols,rows,new Rng(seed),allowedGemCount)","tapeColumns":["type","ax","ay","bx","by","gem","special","amount","combo"],"initial":{"cols":5,"rows":5,"gems":["00201","20220","22012","01002","21210"],"specials":["00000","00000","00000","00000","00000"]},"initialHash":2679416830,"steps":[{"a":[-1,0],"b":[0,0],"valid":0,"peakCombo":0,"tape":[],"hash":2679416830},
+{"a":[0,0],"b":[2,0],"valid":0,"peakCombo":0,"tape":[],"hash":2679416830},
+{"a":[1,1],"b":[1,1],"valid":0,"peakCombo":0,"tape":[],"hash":2679416830},
+{"a":[1,1],"b":[2,2],"valid":0,"peakCombo":0,"tape":[],"hash":2679416830},
+{"a":[4,4],"b":[5,4],"valid":0,"peakCombo":0,"tape":[],"hash":2679416830},
+{"a":[0,0],"b":[0,1],"valid":0,"peakCombo":0,"tape":[[1,0,0,0,1,0,0,0,0]],"hash":2679416830}],"final":{"cols":5,"rows":5,"gems":["00201","20220","22012","01002","21210"],"specials":["00000","00000","00000","00000","00000"]},"finalHash":2679416830}

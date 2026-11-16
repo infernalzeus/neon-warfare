@@ -1,0 +1,150 @@
+rules_version = '2';
+
+// PROPOSED (not live). Claude owns review and publishing. UNVALIDATED: no emulator run yet.
+//
+// Every block that exists in the live firestore.rules is kept byte-for-byte (the shipped Android app
+// depends on it). Additions are marked "NEW". Nothing here loosens an existing rule.
+//
+// Stage 1 (this file): cloud saves for web accounts + an optional pilot-ownership claim that new web
+//   clients create. Android ignores both, so nothing breaks.
+// Stage 2 (later, only after an Android release that creates pilots/{pilotId} claims): change the
+//   leaderboard write rule to require the claim, closing "any signed-in user can overwrite any
+//   pilotId entry". Do NOT ship stage 2 before that Android release.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /leaderboards/{board}/entries/{pilotId} {
+
+      allow read: if true;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid != null
+        && request.resource.data.pilotId == pilotId
+        && request.resource.data.keys().hasOnly(
+             ['pilot','pilotId','mmr','result','durationTicks','scoreTicks','speed',
+              'recordedUtc','score','ghost','updatedAt'])
+        && request.resource.data.pilot is string
+        && request.resource.data.pilot.size() <= 24
+        && request.resource.data.result in [0, 1]
+        && request.resource.data.durationTicks is int
+        && request.resource.data.durationTicks >= 0
+        && request.resource.data.durationTicks < 1000000000
+        && request.resource.data.scoreTicks is int
+        && request.resource.data.scoreTicks >= 0
+        && request.resource.data.scoreTicks < 1000000000
+        && request.resource.data.speed is number
+        && request.resource.data.mmr is int
+        && request.resource.data.ghost is string
+        && request.resource.data.ghost.size() < 60000
+        // `score` must equal RankLadder.SortKey built from the SPEED-NORMALISED tick count.
+        && request.resource.data.score ==
+             (request.resource.data.result * 1000000000
+              + (request.resource.data.result == 1
+                   ? 1000000000 - request.resource.data.scoreTicks
+                   : request.resource.data.scoreTicks));
+
+      allow delete: if false;
+    }
+
+    // One doc per unique pilot name. Key = lowercased name with spaces -> underscores.
+    // First authed writer wins; only the owning uid can change or release it.
+    match /usernames/{key} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['pilotId','uid','name','claimedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 16;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+
+    // Crash / error reports (CrashLog.cs). Write-only for clients; read them in the
+    // Firebase console. No personal data — random per-launch sessionId only.
+    match /diagnostics/{id} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['ts','kind','message','stack','trail','scene','appVersion',
+              'unityVersion','platform','deviceModel','os','sessionId','serverTs'])
+        && request.resource.data.message is string
+        && request.resource.data.message.size() < 2500
+        && request.resource.data.stack is string
+        && request.resource.data.stack.size() < 9000;
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------------- NEW (web) ----------------
+
+    // Cloud save, one doc per pilot slot. Private to the owner. Rules can bound shape and size but
+    // cannot check list elements, so these values are client-trusted (same as the leaderboard).
+    match /users/{uid}/slots/{slot} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && slot in ['0', '1', '2']
+        && request.resource.data.keys().hasOnly(
+             ['schema','name','pilotId','usernameKey','renames','currency','unlocked','updatedAt'])
+        && request.resource.data.schema == 1
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 16
+        && request.resource.data.pilotId is string
+        && request.resource.data.pilotId.size() == 32
+        && request.resource.data.usernameKey is string
+        && request.resource.data.usernameKey.size() <= 64
+        && request.resource.data.renames is int
+        && request.resource.data.renames >= 0
+        && request.resource.data.renames <= 1000
+        && request.resource.data.currency is list
+        && request.resource.data.currency.size() == 5
+        && request.resource.data.unlocked is list
+        && request.resource.data.unlocked.size() <= 20
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Account-wide state (PlayerProgress globals). Document id must be "main".
+    match /users/{uid}/profile/{doc} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && doc == 'main'
+        && request.resource.data.keys().hasOnly(
+             ['schema','mmr','tokens','boostDmg','boostSpd','cosmetics','settings','history','updatedAt'])
+        && request.resource.data.schema == 1
+        && request.resource.data.mmr is int
+        && request.resource.data.mmr >= 0
+        && request.resource.data.mmr < 10000
+        && request.resource.data.tokens is int
+        && request.resource.data.tokens >= 0
+        && request.resource.data.tokens < 10000000
+        && request.resource.data.boostDmg is int
+        && request.resource.data.boostDmg >= 0
+        && request.resource.data.boostDmg <= 3
+        && request.resource.data.boostSpd is int
+        && request.resource.data.boostSpd >= 0
+        && request.resource.data.boostSpd <= 3
+        && request.resource.data.cosmetics is map
+        && request.resource.data.settings is map
+        && request.resource.data.history is list
+        && request.resource.data.history.size() <= 30
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Pilot ownership claim (stage 1: created by new web clients, enforced by nothing yet).
+    // First authed writer wins; only the owner may change or release it.
+    match /pilots/{pilotId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid','claimedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && pilotId.size() == 32;
+      allow update, delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+  }
+}
